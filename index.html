@@ -3,82 +3,458 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Карта Алматы для скаутов</title>
+  <title>E.O.M - Карта для организации работы</title>
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
   <!-- Leaflet.Draw CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+  <!-- Font Awesome для иконок -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- Tailwind CSS через CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { margin: 0; font-family: Arial, sans-serif; overflow: hidden; }
-    #map { height: calc(100vh - 3rem); width: 100%; }
+    body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
+    #map { height: 100vh; width: 100%; }
     .zone-btn { 
-      font-size: 0.75rem; /* Маленький шрифт для кнопок */
-      padding: 0.25rem 0.5rem; 
-      border-radius: 0.375rem; 
-      transition: background-color 0.3s; 
-      white-space: nowrap; /* Предотвращаем перенос текста */
+      font-size: 0.75rem; 
+      padding: 0.35rem 0.6rem; 
+      border-radius: 0.5rem; 
+      transition: all 0.2s;
+      white-space: nowrap;
+      border: 1px solid transparent;
     }
-    .zone-btn.active { background-color: #1e40af; color: white; }
-    #adminPanel { 
+    .zone-btn.active { 
+      background-color: #16a34a; 
+      color: white;
+      border-color: #15803d;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .zone-btn:hover:not(.active) {
+      background-color: #f0fdf4;
+      border-color: #bbf7d0;
+    }
+    #adminPanel, #userPanel { 
       display: none; 
       max-height: 100vh; 
       overflow-y: auto; 
-      z-index: 1000; /* Выше карты */
+      z-index: 1000;
+      background-color: #f7fee7;
     }
     .admin-form input, .admin-form select, .admin-form textarea { 
-      font-size: 0.75rem; 
-      padding: 0.25rem; 
+      font-size: 0.8rem; 
+      padding: 0.4rem; 
       max-width: 100%; 
-      overflow-wrap: break-word; /* Текст не выходит за границы */
+      border-radius: 0.375rem;
+      border: 1px solid #d1fae5;
     }
-    .admin-form button { font-size: 0.75rem; padding: 0.25rem 0.5rem; }
-    .zone-list li { font-size: 0.7rem; padding: 0.25rem 0; }
-    .zone-list button { font-size: 0.7rem; padding: 0.2rem 0.4rem; }
-    /* Убедимся, что элементы не перекрываются */
+    .admin-form button { 
+      font-size: 0.8rem; 
+      padding: 0.4rem 0.8rem; 
+      border-radius: 0.5rem;
+      transition: all 0.2s;
+    }
+    .admin-form button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .zone-list li { 
+      font-size: 0.8rem; 
+      padding: 0.4rem 0; 
+      border-bottom: 1px solid #dcfce7;
+    }
+    .zone-list button { 
+      font-size: 0.75rem; 
+      padding: 0.25rem 0.5rem; 
+      margin-left: 0.3rem;
+    }
     .fixed { z-index: 10; }
     #map { z-index: 1; }
+    .header-logo {
+      font-weight: 700;
+      color: #166534;
+      font-size: 1.1rem;
+      letter-spacing: 0.05em;
+    }
+    .user-badge {
+      background-color: #dcfce7;
+      border-radius: 9999px;
+      padding: 0.2rem 0.6rem;
+      font-size: 0.75rem;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+    .leaflet-popup-content {
+      font-size: 0.9rem;
+    }
+    .leaflet-control-layers {
+      background-color: white;
+      border-radius: 0.5rem;
+      padding: 0.5rem;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+    }
+    .leaflet-control-layers-toggle {
+      background-image: none;
+      width: 36px;
+      height: 36px;
+      background-color: white;
+      border-radius: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+    }
+    .leaflet-control-layers-toggle:after {
+      content: "≡";
+      font-size: 1.2rem;
+      color: #166534;
+    }
   </style>
 </head>
-<body class="bg-gray-100">
-  <!-- Панель управления -->
-  <div class="fixed top-0 w-full bg-white shadow-md p-1 z-10">
-    <div class="flex justify-around gap-1 flex-wrap">
-      <button id="workZone" class="zone-btn bg-blue-100 text-blue-800 font-semibold">Рабочие зоны</button>
-      <button id="restZone" class="zone-btn bg-green-100 text-green-800 font-semibold">Зоны отдыха</button>
-      <button id="officeZone" class="zone-btn bg-yellow-100 text-yellow-800 font-semibold">Офисы</button>
-      <button id="adminLogin" class="zone-btn bg-red-100 text-red-800 font-semibold">Админ</button>
+<body class="bg-green-50">
+  <!-- Шапка приложения -->
+  <div class="fixed top-0 w-full bg-white shadow-sm p-2 z-20 flex justify-between items-center">
+    <div class="header-logo flex items-center">
+      <i class="fas fa-map-marked-alt mr-2 text-green-600"></i>
+      <span>E.O.M</span>
+    </div>
+    <div class="flex items-center space-x-2">
+      <div id="userStatus" class="user-badge hidden">
+        <i class="fas fa-user mr-1"></i>
+        <span id="currentUser">Гость</span>
+      </div>
+      <button id="userLogin" class="zone-btn bg-green-50 text-green-800 font-semibold">
+        <i class="fas fa-sign-in-alt mr-1"></i>Вход
+      </button>
+    </div>
+  </div>
+
+  <!-- Панель управления слоями -->
+  <div class="fixed top-14 left-2 z-10 bg-white p-2 rounded-lg shadow-md hidden" id="layersPanel">
+    <h3 class="text-sm font-semibold mb-2 text-green-800">Слои карты</h3>
+    <div class="space-y-2">
+      <label class="flex items-center space-x-2">
+        <input type="checkbox" id="workLayerToggle" checked class="rounded text-green-600">
+        <span class="text-sm">Рабочие зоны</span>
+      </label>
+      <label class="flex items-center space-x-2">
+        <input type="checkbox" id="restLayerToggle" checked class="rounded text-green-600">
+        <span class="text-sm">Зоны отдыха</span>
+      </label>
+      <label class="flex items-center space-x-2">
+        <input type="checkbox" id="officeLayerToggle" checked class="rounded text-green-600">
+        <span class="text-sm">Офисы</span>
+      </label>
+      <label class="flex items-center space-x-2">
+        <input type="checkbox" id="peopleLayerToggle" checked class="rounded text-green-600">
+        <span class="text-sm">Сотрудники</span>
+      </label>
     </div>
   </div>
 
   <!-- Контейнер для карты -->
-  <div id="map" class="mt-12"></div>
+  <div id="map" class="pt-16"></div>
+
+  <!-- Панель пользователя -->
+  <div id="userPanel" class="fixed inset-0 bg-white p-4">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg font-bold text-green-800 flex items-center">
+        <i class="fas fa-user-circle mr-2"></i>Личный кабинет
+      </h2>
+      <button id="closeUserPanel" class="text-gray-500 hover:text-gray-700">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    
+    <!-- Форма входа -->
+    <div id="loginForm" class="mb-6">
+      <h3 class="text-md font-semibold mb-3 text-green-700">Вход в систему</h3>
+      <div class="mb-3">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Логин</label>
+        <input id="userLoginInput" type="text" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Пароль</label>
+        <input id="userPasswordInput" type="password" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+      </div>
+      <button id="submitUserLogin" class="w-full bg-green-600 text-white p-2 rounded-md hover:bg-green-700 transition">
+        <i class="fas fa-sign-in-alt mr-2"></i>Войти
+      </button>
+      <div class="text-center mt-3">
+        <button id="switchToRegister" class="text-sm text-green-600 hover:underline">Нет аккаунта? Зарегистрироваться</button>
+      </div>
+    </div>
+    
+    <!-- Форма регистрации -->
+    <div id="registerForm" class="mb-6 hidden">
+      <h3 class="text-md font-semibold mb-3 text-green-700">Регистрация</h3>
+      <div class="mb-3">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Имя</label>
+        <input id="regName" type="text" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+      </div>
+      <div class="mb-3">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Логин</label>
+        <input id="regLogin" type="text" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+      </div>
+      <div class="mb-3">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Пароль</label>
+        <input id="regPassword" type="password" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Должность</label>
+        <select id="regPosition" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+          <option value="scout">Скаут</option>
+          <option value="manager">Менеджер</option>
+          <option value="admin">Администратор</option>
+        </select>
+      </div>
+      <button id="submitRegister" class="w-full bg-green-600 text-white p-2 rounded-md hover:bg-green-700 transition">
+        <i class="fas fa-user-plus mr-2"></i>Зарегистрироваться
+      </button>
+      <div class="text-center mt-3">
+        <button id="switchToLogin" class="text-sm text-green-600 hover:underline">Уже есть аккаунт? Войти</button>
+      </div>
+    </div>
+    
+    <!-- Информация о пользователе -->
+    <div id="userInfo" class="hidden">
+      <div class="bg-green-50 p-4 rounded-lg mb-4">
+        <div class="flex items-center mb-3">
+          <div class="bg-green-100 p-3 rounded-full mr-3">
+            <i class="fas fa-user text-green-600 text-xl"></i>
+          </div>
+          <div>
+            <h3 id="userFullName" class="font-bold text-green-800">Иван Иванов</h3>
+            <span id="userPosition" class="text-sm bg-green-100 text-green-700 px-2 py-1 rounded-full">Менеджер</span>
+          </div>
+        </div>
+        <div class="text-sm text-gray-600">
+          <p><i class="fas fa-clock mr-2"></i> <span id="userLastLogin">Последний вход: сегодня в 14:30</span></p>
+        </div>
+      </div>
+      
+      <div class="space-y-2">
+        <button id="userTasksBtn" class="w-full text-left p-2 bg-white border rounded-md hover:bg-green-50 transition flex items-center">
+          <i class="fas fa-tasks mr-2 text-green-600"></i> Мои задания
+        </button>
+        <button id="userTeamBtn" class="w-full text-left p-2 bg-white border rounded-md hover:bg-green-50 transition flex items-center">
+          <i class="fas fa-users mr-2 text-green-600"></i> Моя команда
+        </button>
+        <button id="userReportsBtn" class="w-full text-left p-2 bg-white border rounded-md hover:bg-green-50 transition flex items-center">
+          <i class="fas fa-chart-bar mr-2 text-green-600"></i> Отчеты
+        </button>
+        <button id="userLogout" class="w-full text-left p-2 bg-white border rounded-md hover:bg-red-50 transition flex items-center text-red-600 mt-4">
+          <i class="fas fa-sign-out-alt mr-2"></i> Выйти
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Панель администратора -->
-  <div id="adminPanel" class="fixed inset-0 bg-white p-2">
-    <div class="flex justify-between items-center mb-2">
-      <h2 class="text-sm font-bold">Панель администратора</h2>
-      <button id="closeAdmin" class="text-red-500 text-xs">Закрыть</button>
+  <div id="adminPanel" class="fixed inset-0 bg-white p-4">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg font-bold text-green-800 flex items-center">
+        <i class="fas fa-cog mr-2"></i>Панель администратора
+      </h2>
+      <button id="closeAdmin" class="text-gray-500 hover:text-gray-700">
+        <i class="fas fa-times"></i>
+      </button>
     </div>
-    <!-- Форма входа -->
-    <div id="loginForm" class="mt-2">
-      <input id="adminPassword" type="password" placeholder="Пароль" class="w-full p-1 border rounded-md text-xs">
-      <button id="submitPassword" class="w-full mt-1 bg-blue-500 text-white p-1 rounded-md text-xs">Войти</button>
+    
+    <!-- Навигация по админ-панели -->
+    <div class="flex mb-4 border-b">
+      <button id="adminZonesTab" class="px-4 py-2 font-medium text-green-600 border-b-2 border-green-600">Зоны</button>
+      <button id="adminUsersTab" class="px-4 py-2 font-medium text-gray-500 hover:text-green-600">Пользователи</button>
+      <button id="adminTasksTab" class="px-4 py-2 font-medium text-gray-500 hover:text-green-600">Задания</button>
     </div>
-    <!-- Форма управления зонами -->
-    <div id="adminControls" class="admin-form hidden mt-2">
-      <h3 class="text-xs font-semibold">Добавить/Редактировать зону</h3>
-      <select id="zoneType" class="w-full p-1 border rounded-md text-xs">
-        <option value="work">Рабочая зона</option>
-        <option value="rest">Зона отдыха</option>
-        <option value="office">Офис</option>
-      </select>
-      <input id="zoneName" type="text" placeholder="Название зоны" class="w-full p-1 mt-1 border rounded-md text-xs">
-      <textarea id="zoneCoords" placeholder="Координаты (JSON, например, [[43.25, 76.85], ...])" class="w-full p-1 mt-1 border rounded-md text-xs" rows="3"></textarea>
-      <button id="addZone" class="w-full mt-1 bg-green-500 text-white p-1 rounded-md text-xs">Добавить/Обновить</button>
-      <h3 class="text-xs font-semibold mt-2">Существующие зоны</h3>
-      <ul id="zoneList" class="mt-1"></ul>
+    
+    <!-- Управление зонами -->
+    <div id="adminZonesSection">
+      <div class="bg-green-50 p-4 rounded-lg mb-4">
+        <h3 class="text-md font-semibold mb-3 text-green-700">Добавить/редактировать зону</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Тип зоны</label>
+            <select id="zoneType" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+              <option value="work">Рабочая зона</option>
+              <option value="rest">Зона отдыха</option>
+              <option value="office">Офис</option>
+              <option value="checkpoint">Контрольный пункт</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Название зоны</label>
+            <input id="zoneName" type="text" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+          </div>
+        </div>
+        <div class="mt-3">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Координаты</label>
+          <textarea id="zoneCoords" rows="3" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" placeholder="Можно ввести вручную или нарисовать на карте"></textarea>
+        </div>
+        <div class="mt-3 flex space-x-2">
+          <button id="addZone" class="flex-1 bg-green-600 text-white p-2 rounded-md hover:bg-green-700 transition flex items-center justify-center">
+            <i class="fas fa-plus mr-2"></i> Добавить
+          </button>
+          <button id="updateZone" class="flex-1 bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition flex items-center justify-center hidden">
+            <i class="fas fa-save mr-2"></i> Обновить
+          </button>
+          <button id="cancelEditZone" class="flex-1 bg-gray-200 text-gray-700 p-2 rounded-md hover:bg-gray-300 transition hidden">
+            Отмена
+          </button>
+        </div>
+      </div>
+      
+      <div class="bg-white border rounded-lg overflow-hidden">
+        <h3 class="text-md font-semibold p-3 bg-green-50 text-green-700 border-b">Список зон</h3>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Название</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Тип</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Действия</th>
+              </tr>
+            </thead>
+            <tbody id="zoneList" class="bg-white divide-y divide-gray-200">
+              <!-- Зоны будут добавлены сюда -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Управление пользователями -->
+    <div id="adminUsersSection" class="hidden">
+      <div class="bg-green-50 p-4 rounded-lg mb-4">
+        <h3 class="text-md font-semibold mb-3 text-green-700">Добавить/редактировать пользователя</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Имя</label>
+            <input id="userName" type="text" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Логин</label>
+            <input id="userLoginAdmin" type="text" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Пароль</label>
+            <input id="userPasswordAdmin" type="password" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Должность</label>
+            <select id="userPositionAdmin" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+              <option value="scout">Скаут</option>
+              <option value="manager">Менеджер</option>
+              <option value="admin">Администратор</option>
+            </select>
+          </div>
+        </div>
+        <div class="mt-3 flex space-x-2">
+          <button id="addUser" class="flex-1 bg-green-600 text-white p-2 rounded-md hover:bg-green-700 transition">
+            Добавить пользователя
+          </button>
+          <button id="updateUser" class="flex-1 bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition hidden">
+            Обновить
+          </button>
+          <button id="cancelEditUser" class="flex-1 bg-gray-200 text-gray-700 p-2 rounded-md hover:bg-gray-300 transition hidden">
+            Отмена
+          </button>
+        </div>
+      </div>
+      
+      <div class="bg-white border rounded-lg overflow-hidden">
+        <h3 class="text-md font-semibold p-3 bg-green-50 text-green-700 border-b">Список пользователей</h3>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Имя</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Логин</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Должность</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Действия</th>
+              </tr>
+            </thead>
+            <tbody id="userList" class="bg-white divide-y divide-gray-200">
+              <!-- Пользователи будут добавлены сюда -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Управление заданиями -->
+    <div id="adminTasksSection" class="hidden">
+      <div class="bg-green-50 p-4 rounded-lg mb-4">
+        <h3 class="text-md font-semibold mb-3 text-green-700">Создать задание</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Название</label>
+            <input id="taskName" type="text" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Тип</label>
+            <select id="taskType" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+              <option value="delivery">Доставка</option>
+              <option value="inspection">Проверка</option>
+              <option value="meeting">Встреча</option>
+              <option value="other">Другое</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Исполнитель</label>
+            <select id="taskAssignee" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+              <!-- Пользователи будут добавлены сюда -->
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Срок выполнения</label>
+            <input id="taskDueDate" type="datetime-local" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+          </div>
+        </div>
+        <div class="mt-3">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Описание</label>
+          <textarea id="taskDescription" rows="3" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500"></textarea>
+        </div>
+        <div class="mt-3">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Местоположение</label>
+          <div class="flex space-x-2">
+            <input id="taskLocation" type="text" class="flex-1 p-2 border rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500" placeholder="Адрес или координаты">
+            <button id="selectOnMap" class="bg-green-600 text-white p-2 rounded-md hover:bg-green-700 transition">
+              <i class="fas fa-map-marker-alt"></i>
+            </button>
+          </div>
+        </div>
+        <div class="mt-3 flex space-x-2">
+          <button id="addTask" class="flex-1 bg-green-600 text-white p-2 rounded-md hover:bg-green-700 transition">
+            Создать задание
+          </button>
+          <button id="updateTask" class="flex-1 bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition hidden">
+            Обновить
+          </button>
+          <button id="cancelEditTask" class="flex-1 bg-gray-200 text-gray-700 p-2 rounded-md hover:bg-gray-300 transition hidden">
+            Отмена
+          </button>
+        </div>
+      </div>
+      
+      <div class="bg-white border rounded-lg overflow-hidden">
+        <h3 class="text-md font-semibold p-3 bg-green-50 text-green-700 border-b">Список заданий</h3>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Название</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Исполнитель</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Срок</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Действия</th>
+              </tr>
+            </thead>
+            <tbody id="taskList" class="bg-white divide-y divide-gray-200">
+              <!-- Задания будут добавлены сюда -->
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -86,6 +462,8 @@
   <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
   <!-- Leaflet.Draw JS -->
   <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+  <!-- Font Awesome JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
   <script>
     // Инициализация карты (центр Алматы)
     const map = L.map('map', {
@@ -105,30 +483,78 @@
     let workLayer = L.layerGroup().addTo(map);
     let restLayer = L.layerGroup().addTo(map);
     let officeLayer = L.layerGroup().addTo(map);
+    let checkpointLayer = L.layerGroup().addTo(map);
+    let peopleLayer = L.layerGroup().addTo(map);
+    let tasksLayer = L.layerGroup().addTo(map);
     let drawnItems = new L.FeatureGroup().addTo(map);
 
-    // Загрузка зон из localStorage
-    let zones = JSON.parse(localStorage.getItem('zones')) || {
-      work: [
-        { id: 'w1', coords: [[43.25, 76.85], [43.25, 76.90], [43.30, 76.90], [43.30, 76.85]], popup: 'Рабочая зона: Центр' },
-        { id: 'w2', coords: [[43.22, 76.92], [43.22, 76.97], [43.27, 76.97], [43.27, 76.92]], popup: 'Рабочая зона: Магазины' }
-      ],
-      rest: [
-        { id: 'r1', coords: [[43.23, 76.88], [43.23, 76.93], [43.28, 76.93], [43.28, 76.88]], popup: 'Зона отдыха: Парк' }
-      ],
-      office: [
-        { id: 'o1', coords: [43.238, 76.89], popup: 'Офис компании' }
-      ]
+    // Иконки для разных типов пользователей
+    const userIcons = {
+      scout: L.divIcon({ className: 'fas fa-user bg-blue-500 text-white p-1 rounded-full', iconSize: [24, 24] }),
+      manager: L.divIcon({ className: 'fas fa-user-tie bg-green-500 text-white p-1 rounded-full', iconSize: [24, 24] }),
+      admin: L.divIcon({ className: 'fas fa-user-shield bg-purple-500 text-white p-1 rounded-full', iconSize: [24, 24] })
     };
+
+    // Иконки для заданий
+    const taskIcons = {
+      delivery: L.divIcon({ className: 'fas fa-truck bg-orange-500 text-white p-1 rounded-full', iconSize: [24, 24] }),
+      inspection: L.divIcon({ className: 'fas fa-clipboard-check bg-blue-500 text-white p-1 rounded-full', iconSize: [24, 24] }),
+      meeting: L.divIcon({ className: 'fas fa-handshake bg-green-500 text-white p-1 rounded-full', iconSize: [24, 24] }),
+      other: L.divIcon({ className: 'fas fa-tasks bg-gray-500 text-white p-1 rounded-full', iconSize: [24, 24] })
+    };
+
+    // Данные приложения
+    let appData = JSON.parse(localStorage.getItem('eomData')) || {
+      users: [
+        { id: 'u1', name: 'Администратор', login: 'admin', password: 'admin', position: 'admin', lastLogin: new Date().toISOString() },
+        { id: 'u2', name: 'Менеджер', login: 'manager', password: 'manager', position: 'manager', lastLogin: new Date().toISOString() },
+        { id: 'u3', name: 'Скаут', login: 'scout', password: 'scout', position: 'scout', lastLogin: new Date().toISOString() }
+      ],
+      zones: {
+        work: [
+          { id: 'w1', coords: [[43.25, 76.85], [43.25, 76.90], [43.30, 76.90], [43.30, 76.85]], name: 'Центральный район', description: 'Основная рабочая зона' },
+          { id: 'w2', coords: [[43.22, 76.92], [43.22, 76.97], [43.27, 76.97], [43.27, 76.92]], name: 'Торговая зона', description: 'Магазины и торговые центры' }
+        ],
+        rest: [
+          { id: 'r1', coords: [[43.23, 76.88], [43.23, 76.93], [43.28, 76.93], [43.28, 76.88]], name: 'Центральный парк', description: 'Место для отдыха сотрудников' }
+        ],
+        office: [
+          { id: 'o1', coords: [43.238, 76.89], name: 'Главный офис', description: 'Основное здание компании' }
+        ],
+        checkpoint: [
+          { id: 'c1', coords: [43.24, 76.91], name: 'Контрольный пункт 1', description: 'Проверка документов' }
+        ]
+      },
+      tasks: [
+        { id: 't1', name: 'Доставка документов', type: 'delivery', assignee: 'u3', 
+          dueDate: new Date(Date.now() + 86400000).toISOString(), 
+          description: 'Доставить документы в главный офис', 
+          location: [43.238, 76.89], status: 'pending' }
+      ],
+      peopleLocations: {
+        u1: [43.238, 76.89],
+        u2: [43.24, 76.88],
+        u3: [43.245, 76.895]
+      }
+    };
+
+    // Текущий пользователь
+    let currentUser = null;
 
     // Leaflet.Draw для рисования зон
     const drawControl = new L.Control.Draw({
       edit: { featureGroup: drawnItems },
-      draw: { polyline: false, circle: false, marker: true, polygon: true, rectangle: true }
+      draw: { 
+        polyline: false, 
+        circle: false, 
+        marker: true, 
+        polygon: true, 
+        rectangle: true,
+        circlemarker: false
+      }
     });
 
     // Показываем Draw Control только для админа
-    let isAdmin = false;
     function toggleDrawControl(show) {
       if (show) {
         map.addControl(drawControl);
@@ -142,16 +568,45 @@
       const layer = e.layer;
       drawnItems.addLayer(layer);
       const type = document.getElementById('zoneType').value;
-      const name = prompt('Введите название зоны', 'Новая зона') || 'Новая зона';
+      const name = document.getElementById('zoneName').value || `Новая зона ${Date.now().toString().slice(-4)}`;
       const id = `${type}_${Date.now()}`;
       let coords;
+      
       if (e.layerType === 'marker') {
         coords = [layer.getLatLng().lat, layer.getLatLng().lng];
       } else {
         coords = layer.getLatLngs()[0].map(l => [l.lat, l.lng]);
       }
-      zones[type].push({ id, coords, popup: name });
-      saveZones();
+      
+      // Если идет редактирование, обновляем существующую зону
+      if (document.getElementById('updateZone').classList.contains('hidden') === false) {
+        const editId = document.getElementById('updateZone').dataset.editId;
+        const editType = document.getElementById('updateZone').dataset.editType;
+        
+        // Удаляем старую зону
+        appData.zones[editType] = appData.zones[editType].filter(z => z.id !== editId);
+        
+        // Добавляем обновленную
+        appData.zones[type].push({ 
+          id: editId, 
+          coords, 
+          name,
+          description: document.getElementById('zoneDescription').value || ''
+        });
+        
+        // Сбрасываем режим редактирования
+        cancelZoneEdit();
+      } else {
+        // Добавляем новую зону
+        appData.zones[type].push({ 
+          id, 
+          coords, 
+          name,
+          description: document.getElementById('zoneDescription').value || ''
+        });
+      }
+      
+      saveData();
       addZones();
       updateZoneList();
     });
@@ -161,24 +616,134 @@
       workLayer.clearLayers();
       restLayer.clearLayers();
       officeLayer.clearLayers();
+      checkpointLayer.clearLayers();
+      peopleLayer.clearLayers();
+      tasksLayer.clearLayers();
 
-      zones.work.forEach(zone => {
-        L.polygon(zone.coords, { color: 'blue', fillOpacity: 0.3 })
-          .addTo(workLayer)
-          .bindPopup(zone.popup);
+      // Рабочие зоны
+      appData.zones.work.forEach(zone => {
+        const polygon = L.polygon(zone.coords, { 
+          color: '#2563eb', 
+          fillColor: '#3b82f6', 
+          fillOpacity: 0.3,
+          weight: 2
+        }).addTo(workLayer);
+        
+        polygon.bindPopup(`
+          <div class="font-semibold text-blue-800">${zone.name}</div>
+          <div class="text-sm text-gray-600 mt-1">${zone.description}</div>
+          <div class="text-xs text-gray-500 mt-2">Рабочая зона</div>
+        `);
       });
 
-      zones.rest.forEach(zone => {
-        L.polygon(zone.coords, { color: 'green', fillOpacity: 0.3 })
-          .addTo(restLayer)
-          .bindPopup(zone.popup);
+      // Зоны отдыха
+      appData.zones.rest.forEach(zone => {
+        const polygon = L.polygon(zone.coords, { 
+          color: '#16a34a', 
+          fillColor: '#22c55e', 
+          fillOpacity: 0.3,
+          weight: 2
+        }).addTo(restLayer);
+        
+        polygon.bindPopup(`
+          <div class="font-semibold text-green-800">${zone.name}</div>
+          <div class="text-sm text-gray-600 mt-1">${zone.description}</div>
+          <div class="text-xs text-gray-500 mt-2">Зона отдыха</div>
+        `);
       });
 
-      zones.office.forEach(zone => {
-        L.marker(zone.coords, {
-          icon: L.divIcon({ className: 'bg-yellow-500 rounded-full w-3 h-3' })
-        }).addTo(officeLayer).bindPopup(zone.popup);
+      // Офисы
+      appData.zones.office.forEach(zone => {
+        const marker = L.marker(zone.coords, {
+          icon: L.divIcon({ 
+            className: 'fas fa-building bg-yellow-500 text-white p-1 rounded-full',
+            iconSize: [24, 24]
+          })
+        }).addTo(officeLayer);
+        
+        marker.bindPopup(`
+          <div class="font-semibold text-yellow-800">${zone.name}</div>
+          <div class="text-sm text-gray-600 mt-1">${zone.description}</div>
+          <div class="text-xs text-gray-500 mt-2">Офис</div>
+        `);
       });
+
+      // Контрольные пункты
+      appData.zones.checkpoint.forEach(zone => {
+        const marker = L.marker(zone.coords, {
+          icon: L.divIcon({ 
+            className: 'fas fa-flag bg-red-500 text-white p-1 rounded-full',
+            iconSize: [24, 24]
+          })
+        }).addTo(checkpointLayer);
+        
+        marker.bindPopup(`
+          <div class="font-semibold text-red-800">${zone.name}</div>
+          <div class="text-sm text-gray-600 mt-1">${zone.description}</div>
+          <div class="text-xs text-gray-500 mt-2">Контрольный пункт</div>
+        `);
+      });
+
+      // Пользователи
+      Object.entries(appData.peopleLocations).forEach(([userId, coords]) => {
+        const user = appData.users.find(u => u.id === userId);
+        if (user) {
+          const marker = L.marker(coords, {
+            icon: userIcons[user.position]
+          }).addTo(peopleLayer);
+          
+          marker.bindPopup(`
+            <div class="font-semibold">${user.name}</div>
+            <div class="text-sm text-gray-600 mt-1">${getPositionName(user.position)}</div>
+            <div class="text-xs text-gray-500 mt-2">${user.login}</div>
+          `);
+        }
+      });
+
+      // Задания
+      appData.tasks.forEach(task => {
+        const marker = L.marker(task.location, {
+          icon: taskIcons[task.type]
+        }).addTo(tasksLayer);
+        
+        const assignee = appData.users.find(u => u.id === task.assignee);
+        const assigneeName = assignee ? assignee.name : 'Не назначен';
+        
+        marker.bindPopup(`
+          <div class="font-semibold">${task.name}</div>
+          <div class="text-sm text-gray-600 mt-1">${task.description}</div>
+          <div class="text-xs mt-2">
+            <span class="font-medium">Исполнитель:</span> ${assigneeName}
+          </div>
+          <div class="text-xs">
+            <span class="font-medium">Срок:</span> ${new Date(task.dueDate).toLocaleString()}
+          </div>
+          <div class="text-xs">
+            <span class="font-medium">Статус:</span> ${getTaskStatusName(task.status)}
+          </div>
+        `);
+      });
+    }
+
+    // Получение названия должности
+    function getPositionName(position) {
+      const positions = {
+        scout: 'Скаут',
+        manager: 'Менеджер',
+        admin: 'Администратор'
+      };
+      return positions[position] || position;
+    }
+
+    // Получение названия статуса задания
+    function getTaskStatusName(status) {
+      const statuses = {
+        pending: 'В ожидании',
+        in_progress: 'В работе',
+        completed: 'Завершено',
+        cancelled: 'Отменено'
+      };
+      return statuses[status] || status;
     }
 
     // Загрузка данных из Overpass API (кафе)
@@ -198,8 +763,11 @@
         data.elements.forEach(element => {
           if (element.type === 'node') {
             L.marker([element.lat, element.lon], {
-              icon: L.divIcon({ className: 'bg-red-500 rounded-full w-2 h-2' })
-            }).addTo(restLayer).bindPopup(element.tags.name || 'Кафе');
+              icon: L.divIcon({ className: 'fas fa-coffee bg-brown-500 text-white p-1 rounded-full', iconSize: [24, 24] })
+            }).addTo(restLayer).bindPopup(`
+              <div class="font-semibold">${element.tags.name || 'Кафе'}</div>
+              ${element.tags['addr:street'] ? `<div class="text-sm">${element.tags['addr:street']}</div>` : ''}
+            `);
           }
         });
       } catch (error) {
@@ -207,138 +775,832 @@
       }
     }
 
-    // Сохранение зон в localStorage
-    function saveZones() {
-      localStorage.setItem('zones', JSON.stringify(zones));
+    // Сохранение данных в localStorage
+    function saveData() {
+      localStorage.setItem('eomData', JSON.stringify(appData));
     }
 
     // Обновление списка зон в админ-панели
     function updateZoneList() {
       const zoneList = document.getElementById('zoneList');
       zoneList.innerHTML = '';
-      Object.keys(zones).forEach(type => {
-        zones[type].forEach(zone => {
-          const li = document.createElement('li');
-          li.className = 'flex justify-between items-center border-b';
-          li.innerHTML = `
-            <span class="truncate max-w-[60%] text-xs">${zone.popup} (${type})</span>
-            <div class="flex gap-1">
-              <button class="edit-zone text-blue-500" data-id="${zone.id}" data-type="${type}">Ред.</button>
-              <button class="delete-zone text-red-500" data-id="${zone.id}" data-type="${type}">Уд.</button>
-            </div>
+      
+      Object.entries(appData.zones).forEach(([type, zones]) => {
+        zones.forEach(zone => {
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-gray-50';
+          tr.innerHTML = `
+            <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${zone.name}</td>
+            <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${getZoneTypeName(type)}</td>
+            <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
+              <button class="edit-zone text-blue-600 hover:text-blue-800 mr-2" data-id="${zone.id}" data-type="${type}">
+                <i class="fas fa-edit"></i>
+              </button>
+              <button class="delete-zone text-red-600 hover:text-red-800" data-id="${zone.id}" data-type="${type}">
+                <i class="fas fa-trash"></i>
+              </button>
+            </td>
           `;
-          zoneList.appendChild(li);
+          zoneList.appendChild(tr);
         });
       });
 
+      // Обработчики для кнопок редактирования и удаления
       document.querySelectorAll('.edit-zone').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.dataset.id;
           const type = btn.dataset.type;
-          const zone = zones[type].find(z => z.id === id);
+          const zone = appData.zones[type].find(z => z.id === id);
+          
           document.getElementById('zoneType').value = type;
-          document.getElementById('zoneName').value = zone.popup;
+          document.getElementById('zoneName').value = zone.name;
           document.getElementById('zoneCoords').value = JSON.stringify(zone.coords);
-          document.getElementById('addZone').dataset.editId = id;
-          document.getElementById('addZone').dataset.editType = type;
+          document.getElementById('zoneDescription').value = zone.description || '';
+          
+          // Переключаем в режим редактирования
+          document.getElementById('addZone').classList.add('hidden');
+          document.getElementById('updateZone').classList.remove('hidden');
+          document.getElementById('cancelEditZone').classList.remove('hidden');
+          
+          document.getElementById('updateZone').dataset.editId = id;
+          document.getElementById('updateZone').dataset.editType = type;
         });
       });
 
       document.querySelectorAll('.delete-zone').forEach(btn => {
         btn.addEventListener('click', () => {
-          const id = btn.dataset.id;
-          const type = btn.dataset.type;
-          zones[type] = zones[type].filter(z => z.id !== id);
-          saveZones();
-          addZones();
-          updateZoneList();
+          if (confirm('Вы уверены, что хотите удалить эту зону?')) {
+            const id = btn.dataset.id;
+            const type = btn.dataset.type;
+            appData.zones[type] = appData.zones[type].filter(z => z.id !== id);
+            saveData();
+            addZones();
+            updateZoneList();
+          }
         });
       });
     }
 
-    // Управление видимостью зон
-    document.getElementById('workZone').addEventListener('click', () => toggleLayer(workLayer, 'workZone'));
-    document.getElementById('restZone').addEventListener('click', () => toggleLayer(restLayer, 'restZone'));
-    document.getElementById('officeZone').addEventListener('click', () => toggleLayer(officeLayer, 'officeZone'));
+    // Получение названия типа зоны
+    function getZoneTypeName(type) {
+      const types = {
+        work: 'Рабочая зона',
+        rest: 'Зона отдыха',
+        office: 'Офис',
+        checkpoint: 'Контрольный пункт'
+      };
+      return types[type] || type;
+    }
 
-    function toggleLayer(layer, buttonId) {
-      if (map.hasLayer(layer)) {
-        map.removeLayer(layer);
-        document.getElementById(buttonId).classList.remove('active');
+    // Выход из режима редактирования зоны
+    function cancelZoneEdit() {
+      document.getElementById('zoneName').value = '';
+      document.getElementById('zoneCoords').value = '';
+      document.getElementById('zoneDescription').value = '';
+      
+      document.getElementById('addZone').classList.remove('hidden');
+      document.getElementById('updateZone').classList.add('hidden');
+      document.getElementById('cancelEditZone').classList.add('hidden');
+      
+      delete document.getElementById('updateZone').dataset.editId;
+      delete document.getElementById('updateZone').dataset.editType;
+    }
+
+    // Обновление списка пользователей в админ-панели
+    function updateUserList() {
+      const userList = document.getElementById('userList');
+      userList.innerHTML = '';
+      
+      // Обновляем список в форме создания задания
+      const taskAssigneeSelect = document.getElementById('taskAssignee');
+      taskAssigneeSelect.innerHTML = '';
+      
+      appData.users.forEach(user => {
+        // Добавляем в таблицу пользователей
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-gray-50';
+        tr.innerHTML = `
+          <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${user.name}</td>
+          <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${user.login}</td>
+          <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${getPositionName(user.position)}</td>
+          <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
+            <button class="edit-user text-blue-600 hover:text-blue-800 mr-2" data-id="${user.id}">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="delete-user text-red-600 hover:text-red-800" data-id="${user.id}">
+              <i class="fas fa-trash"></i>
+            </button>
+          </td>
+        `;
+        userList.appendChild(tr);
+        
+        // Добавляем в выпадающий список для заданий
+        const option = document.createElement('option');
+        option.value = user.id;
+        option.textContent = `${user.name} (${getPositionName(user.position)})`;
+        taskAssigneeSelect.appendChild(option);
+      });
+
+      // Обработчики для кнопок редактирования и удаления пользователей
+      document.querySelectorAll('.edit-user').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.id;
+          const user = appData.users.find(u => u.id === id);
+          
+          document.getElementById('userName').value = user.name;
+          document.getElementById('userLoginAdmin').value = user.login;
+          document.getElementById('userPasswordAdmin').value = '';
+          document.getElementById('userPositionAdmin').value = user.position;
+          
+          // Переключаем в режим редактирования
+          document.getElementById('addUser').classList.add('hidden');
+          document.getElementById('updateUser').classList.remove('hidden');
+          document.getElementById('cancelEditUser').classList.remove('hidden');
+          
+          document.getElementById('updateUser').dataset.editId = id;
+        });
+      });
+
+      document.querySelectorAll('.delete-user').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (confirm('Вы уверены, что хотите удалить этого пользователя?')) {
+            const id = btn.dataset.id;
+            appData.users = appData.users.filter(u => u.id !== id);
+            
+            // Удаляем местоположение пользователя, если оно есть
+            if (appData.peopleLocations[id]) {
+              delete appData.peopleLocations[id];
+            }
+            
+            // Удаляем пользователя из заданий
+            appData.tasks.forEach(task => {
+              if (task.assignee === id) {
+                task.assignee = '';
+              }
+            });
+            
+            saveData();
+            updateUserList();
+            updateTaskList();
+            addZones();
+          }
+        });
+      });
+    }
+
+    // Выход из режима редактирования пользователя
+    function cancelUserEdit() {
+      document.getElementById('userName').value = '';
+      document.getElementById('userLoginAdmin').value = '';
+      document.getElementById('userPasswordAdmin').value = '';
+      document.getElementById('userPositionAdmin').value = 'scout';
+      
+      document.getElementById('addUser').classList.remove('hidden');
+      document.getElementById('updateUser').classList.add('hidden');
+      document.getElementById('cancelEditUser').classList.add('hidden');
+      
+      delete document.getElementById('updateUser').dataset.editId;
+    }
+
+    // Обновление списка заданий
+    function updateTaskList() {
+      const taskList = document.getElementById('taskList');
+      taskList.innerHTML = '';
+      
+      appData.tasks.forEach(task => {
+        const assignee = appData.users.find(u => u.id === task.assignee);
+        const assigneeName = assignee ? `${assignee.name} (${getPositionName(assignee.position)})` : 'Не назначен';
+        
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-gray-50';
+        tr.innerHTML = `
+          <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${task.name}</td>
+          <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${assigneeName}</td>
+          <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
+            <span class="px-2 py-1 rounded-full text-xs ${getTaskStatusClass(task.status)}">
+              ${getTaskStatusName(task.status)}
+            </span>
+          </td>
+          <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${new Date(task.dueDate).toLocaleDateString()}</td>
+          <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
+            <button class="edit-task text-blue-600 hover:text-blue-800 mr-2" data-id="${task.id}">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="delete-task text-red-600 hover:text-red-800" data-id="${task.id}">
+              <i class="fas fa-trash"></i>
+            </button>
+          </td>
+        `;
+        taskList.appendChild(tr);
+      });
+
+      // Обработчики для кнопок редактирования и удаления заданий
+      document.querySelectorAll('.edit-task').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.id;
+          const task = appData.tasks.find(t => t.id === id);
+          
+          document.getElementById('taskName').value = task.name;
+          document.getElementById('taskType').value = task.type;
+          document.getElementById('taskAssignee').value = task.assignee;
+          document.getElementById('taskDueDate').value = new Date(task.dueDate).toISOString().slice(0, 16);
+          document.getElementById('taskDescription').value = task.description;
+          document.getElementById('taskLocation').value = task.location.join(', ');
+          
+          // Переключаем в режим редактирования
+          document.getElementById('addTask').classList.add('hidden');
+          document.getElementById('updateTask').classList.remove('hidden');
+          document.getElementById('cancelEditTask').classList.remove('hidden');
+          
+          document.getElementById('updateTask').dataset.editId = id;
+        });
+      });
+
+      document.querySelectorAll('.delete-task').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (confirm('Вы уверены, что хотите удалить это задание?')) {
+            const id = btn.dataset.id;
+            appData.tasks = appData.tasks.filter(t => t.id !== id);
+            saveData();
+            updateTaskList();
+            addZones();
+          }
+        });
+      });
+    }
+
+    // Получение класса для статуса задания
+    function getTaskStatusClass(status) {
+      const classes = {
+        pending: 'bg-yellow-100 text-yellow-800',
+        in_progress: 'bg-blue-100 text-blue-800',
+        completed: 'bg-green-100 text-green-800',
+        cancelled: 'bg-red-100 text-red-800'
+      };
+      return classes[status] || 'bg-gray-100 text-gray-800';
+    }
+
+    // Выход из режима редактирования задания
+    function cancelTaskEdit() {
+      document.getElementById('taskName').value = '';
+      document.getElementById('taskType').value = 'delivery';
+      document.getElementById('taskAssignee').value = '';
+      document.getElementById('taskDueDate').value = '';
+      document.getElementById('taskDescription').value = '';
+      document.getElementById('taskLocation').value = '';
+      
+      document.getElementById('addTask').classList.remove('hidden');
+      document.getElementById('updateTask').classList.add('hidden');
+      document.getElementById('cancelEditTask').classList.add('hidden');
+      
+      delete document.getElementById('updateTask').dataset.editId;
+    }
+
+    // Управление видимостью слоев
+    document.getElementById('workLayerToggle').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        map.addLayer(workLayer);
       } else {
-        map.addLayer(layer);
-        document.getElementById(buttonId).classList.add('active');
+        map.removeLayer(workLayer);
       }
+    });
+
+    document.getElementById('restLayerToggle').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        map.addLayer(restLayer);
+      } else {
+        map.removeLayer(restLayer);
+      }
+    });
+
+    document.getElementById('officeLayerToggle').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        map.addLayer(officeLayer);
+      } else {
+        map.removeLayer(officeLayer);
+      }
+    });
+
+    document.getElementById('peopleLayerToggle').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        map.addLayer(peopleLayer);
+      } else {
+        map.removeLayer(peopleLayer);
+      }
+    });
+
+    // Управление панелью слоев
+    const layersToggle = document.createElement('div');
+    layersToggle.className = 'leaflet-control-layers-toggle';
+    layersToggle.title = 'Показать/скрыть слои';
+    layersToggle.addEventListener('click', () => {
+      const panel = document.getElementById('layersPanel');
+      panel.classList.toggle('hidden');
+    });
+
+    // Добавляем кнопку управления слоями на карту
+    L.Control.LayersToggle = L.Control.extend({
+      onAdd: function(map) {
+        const container = L.DomUtil.create('div', 'leaflet-control-layers leaflet-bar');
+        container.appendChild(layersToggle);
+        return container;
+      }
+    });
+
+    new L.Control.LayersToggle({ position: 'topright' }).addTo(map);
+
+    // Управление пользовательской панелью
+    const userPanel = document.getElementById('userPanel');
+    const userLoginBtn = document.getElementById('userLogin');
+    const closeUserPanel = document.getElementById('closeUserPanel');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const userInfo = document.getElementById('userInfo');
+    const switchToRegister = document.getElementById('switchToRegister');
+    const switchToLogin = document.getElementById('switchToLogin');
+    const submitUserLogin = document.getElementById('submitUserLogin');
+    const submitRegister = document.getElementById('submitRegister');
+    const userLogout = document.getElementById('userLogout');
+
+    userLoginBtn.addEventListener('click', () => {
+      userPanel.style.display = 'block';
+      if (currentUser) {
+        showUserInfo();
+      } else {
+        showLoginForm();
+      }
+    });
+
+    closeUserPanel.addEventListener('click', () => {
+      userPanel.style.display = 'none';
+    });
+
+    switchToRegister.addEventListener('click', () => {
+      loginForm.classList.add('hidden');
+      registerForm.classList.remove('hidden');
+    });
+
+    switchToLogin.addEventListener('click', () => {
+      registerForm.classList.add('hidden');
+      loginForm.classList.remove('hidden');
+    });
+
+    submitUserLogin.addEventListener('click', () => {
+      const login = document.getElementById('userLoginInput').value;
+      const password = document.getElementById('userPasswordInput').value;
+      
+      const user = appData.users.find(u => u.login === login && u.password === password);
+      if (user) {
+        currentUser = user;
+        user.lastLogin = new Date().toISOString();
+        saveData();
+        
+        // Обновляем статус пользователя
+        document.getElementById('userStatus').classList.remove('hidden');
+        document.getElementById('currentUser').textContent = user.name;
+        userLoginBtn.innerHTML = '<i class="fas fa-user mr-1"></i>Профиль';
+        
+        showUserInfo();
+      } else {
+        alert('Неверный логин или пароль');
+      }
+    });
+
+    submitRegister.addEventListener('click', () => {
+      const name = document.getElementById('regName').value;
+      const login = document.getElementById('regLogin').value;
+      const password = document.getElementById('regPassword').value;
+      const position = document.getElementById('regPosition').value;
+      
+      if (!name || !login || !password) {
+        alert('Заполните все обязательные поля');
+        return;
+      }
+      
+      if (appData.users.some(u => u.login === login)) {
+        alert('Пользователь с таким логином уже существует');
+        return;
+      }
+      
+      const newUser = {
+        id: `u${Date.now()}`,
+        name,
+        login,
+        password,
+        position,
+        lastLogin: new Date().toISOString()
+      };
+      
+      appData.users.push(newUser);
+      saveData();
+      
+      // Автоматически входим под новым пользователем
+      currentUser = newUser;
+      document.getElementById('userStatus').classList.remove('hidden');
+      document.getElementById('currentUser').textContent = name;
+      userLoginBtn.innerHTML = '<i class="fas fa-user mr-1"></i>Профиль';
+      
+      showUserInfo();
+      registerForm.classList.add('hidden');
+    });
+
+    userLogout.addEventListener('click', () => {
+      currentUser = null;
+      document.getElementById('userStatus').classList.add('hidden');
+      userLoginBtn.innerHTML = '<i class="fas fa-sign-in-alt mr-1"></i>Вход';
+      showLoginForm();
+    });
+
+    function showLoginForm() {
+      loginForm.classList.remove('hidden');
+      registerForm.classList.add('hidden');
+      userInfo.classList.add('hidden');
+    }
+
+    function showUserInfo() {
+      loginForm.classList.add('hidden');
+      registerForm.classList.add('hidden');
+      userInfo.classList.remove('hidden');
+      
+      document.getElementById('userFullName').textContent = currentUser.name;
+      document.getElementById('userPosition').textContent = getPositionName(currentUser.position);
+      document.getElementById('userLastLogin').textContent = `Последний вход: ${new Date(currentUser.lastLogin).toLocaleString()}`;
     }
 
     // Управление админ-панелью
     const adminPanel = document.getElementById('adminPanel');
-    const loginForm = document.getElementById('loginForm');
-    const adminControls = document.getElementById('adminControls');
-    const adminPassword = document.getElementById('adminPassword');
-    const submitPassword = document.getElementById('submitPassword');
+    const adminLoginBtn = document.getElementById('adminLogin');
     const closeAdmin = document.getElementById('closeAdmin');
-    const addZone = document.getElementById('addZone');
+    const adminZonesTab = document.getElementById('adminZonesTab');
+    const adminUsersTab = document.getElementById('adminUsersTab');
+    const adminTasksTab = document.getElementById('adminTasksTab');
+    const adminZonesSection = document.getElementById('adminZonesSection');
+    const adminUsersSection = document.getElementById('adminUsersSection');
+    const adminTasksSection = document.getElementById('adminTasksSection');
+    const addZoneBtn = document.getElementById('addZone');
+    const updateZoneBtn = document.getElementById('updateZone');
+    const cancelEditZoneBtn = document.getElementById('cancelEditZone');
+    const addUserBtn = document.getElementById('addUser');
+    const updateUserBtn = document.getElementById('updateUser');
+    const cancelEditUserBtn = document.getElementById('cancelEditUser');
+    const addTaskBtn = document.getElementById('addTask');
+    const updateTaskBtn = document.getElementById('updateTask');
+    const cancelEditTaskBtn = document.getElementById('cancelEditTask');
+    const selectOnMapBtn = document.getElementById('selectOnMap');
 
-    document.getElementById('adminLogin').addEventListener('click', () => {
-      adminPanel.style.display = 'block';
-      loginForm.style.display = 'block';
-      adminControls.style.display = 'none';
-    });
-
-    submitPassword.addEventListener('click', () => {
-      if (adminPassword.value === 'root') {
-        loginForm.style.display = 'none';
-        adminControls.style.display = 'block';
-        isAdmin = true;
-        toggleDrawControl(true);
-        updateZoneList();
-      } else {
-        alert('Неверный пароль');
-      }
-    });
+    // Проверяем, есть ли кнопка adminLoginBtn (она может быть скрыта для обычных пользователей)
+    if (adminLoginBtn) {
+      adminLoginBtn.addEventListener('click', () => {
+        if (!currentUser) {
+          userPanel.style.display = 'block';
+          showLoginForm();
+          return;
+        }
+        
+        if (currentUser.position === 'admin') {
+          adminPanel.style.display = 'block';
+          toggleDrawControl(true);
+          updateZoneList();
+          updateUserList();
+          updateTaskList();
+        } else {
+          alert('У вас нет прав администратора');
+        }
+      });
+    }
 
     closeAdmin.addEventListener('click', () => {
       adminPanel.style.display = 'none';
-      adminPassword.value = '';
-      isAdmin = false;
       toggleDrawControl(false);
+      cancelZoneEdit();
+      cancelUserEdit();
+      cancelTaskEdit();
     });
 
-    addZone.addEventListener('click', () => {
+    adminZonesTab.addEventListener('click', () => {
+      adminZonesTab.classList.add('text-green-600', 'border-green-600');
+      adminZonesTab.classList.remove('text-gray-500');
+      adminUsersTab.classList.add('text-gray-500');
+      adminUsersTab.classList.remove('text-green-600', 'border-green-600');
+      adminTasksTab.classList.add('text-gray-500');
+      adminTasksTab.classList.remove('text-green-600', 'border-green-600');
+      
+      adminZonesSection.classList.remove('hidden');
+      adminUsersSection.classList.add('hidden');
+      adminTasksSection.classList.add('hidden');
+    });
+
+    adminUsersTab.addEventListener('click', () => {
+      adminUsersTab.classList.add('text-green-600', 'border-green-600');
+      adminUsersTab.classList.remove('text-gray-500');
+      adminZonesTab.classList.add('text-gray-500');
+      adminZonesTab.classList.remove('text-green-600', 'border-green-600');
+      adminTasksTab.classList.add('text-gray-500');
+      adminTasksTab.classList.remove('text-green-600', 'border-green-600');
+      
+      adminUsersSection.classList.remove('hidden');
+      adminZonesSection.classList.add('hidden');
+      adminTasksSection.classList.add('hidden');
+    });
+
+    adminTasksTab.addEventListener('click', () => {
+      adminTasksTab.classList.add('text-green-600', 'border-green-600');
+      adminTasksTab.classList.remove('text-gray-500');
+      adminZonesTab.classList.add('text-gray-500');
+      adminZonesTab.classList.remove('text-green-600', 'border-green-600');
+      adminUsersTab.classList.add('text-gray-500');
+      adminUsersTab.classList.remove('text-green-600', 'border-green-600');
+      
+      adminTasksSection.classList.remove('hidden');
+      adminZonesSection.classList.add('hidden');
+      adminUsersSection.classList.add('hidden');
+    });
+
+    addZoneBtn.addEventListener('click', () => {
       const type = document.getElementById('zoneType').value;
       const name = document.getElementById('zoneName').value;
       let coords;
+      
       try {
         coords = JSON.parse(document.getElementById('zoneCoords').value || '[]');
       } catch (e) {
         alert('Неверный формат координат (используйте JSON)');
         return;
       }
-      const id = addZone.dataset.editId || `${type}_${Date.now()}`;
+      
       if (name && coords.length) {
-        if (addZone.dataset.editId) {
-          const oldType = addZone.dataset.editType;
-          zones[oldType] = zones[oldType].filter(z => z.id !== id);
-          delete addZone.dataset.editId;
-          delete addZone.dataset.editType;
-        }
-        zones[type].push({ id, coords, popup: name });
-        saveZones();
+        const id = `${type}_${Date.now()}`;
+        appData.zones[type].push({ 
+          id, 
+          coords, 
+          name,
+          description: document.getElementById('zoneDescription').value || ''
+        });
+        
+        saveData();
         addZones();
         updateZoneList();
+        
         document.getElementById('zoneName').value = '';
         document.getElementById('zoneCoords').value = '';
+        document.getElementById('zoneDescription').value = '';
       } else {
         alert('Заполните название и координаты');
       }
     });
 
-    // Инициализация
-    addZones();
-    loadCafes();
-    toggleDrawControl(false); // Draw Control скрыт по умолчанию
+    updateZoneBtn.addEventListener('click', () => {
+      const id = updateZoneBtn.dataset.editId;
+      const oldType = updateZoneBtn.dataset.editType;
+      const type = document.getElementById('zoneType').value;
+      const name = document.getElementById('zoneName').value;
+      let coords;
+      
+      try {
+        coords = JSON.parse(document.getElementById('zoneCoords').value || '[]');
+      } catch (e) {
+        alert('Неверный формат координат (используйте JSON)');
+        return;
+      }
+      
+      if (name && coords.length) {
+        // Удаляем старую зону
+        appData.zones[oldType] = appData.zones[oldType].filter(z => z.id !== id);
+        
+        // Добавляем обновленную
+        appData.zones[type].push({ 
+          id, 
+          coords, 
+          name,
+          description: document.getElementById('zoneDescription').value || ''
+        });
+        
+        saveData();
+        addZones();
+        updateZoneList();
+        cancelZoneEdit();
+      } else {
+        alert('Заполните название и координаты');
+      }
+    });
+
+    cancelEditZoneBtn.addEventListener('click', cancelZoneEdit);
+
+    addUserBtn.addEventListener('click', () => {
+      const name = document.getElementById('userName').value;
+      const login = document.getElementById('userLoginAdmin').value;
+      const password = document.getElementById('userPasswordAdmin').value;
+      const position = document.getElementById('userPositionAdmin').value;
+      
+      if (!name || !login || !password) {
+        alert('Заполните все обязательные поля');
+        return;
+      }
+      
+      if (appData.users.some(u => u.login === login)) {
+        alert('Пользователь с таким логином уже существует');
+        return;
+      }
+      
+      const newUser = {
+        id: `u${Date.now()}`,
+        name,
+        login,
+        password,
+        position,
+        lastLogin: new Date().toISOString()
+      };
+      
+      appData.users.push(newUser);
+      saveData();
+      updateUserList();
+      
+      document.getElementById('userName').value = '';
+      document.getElementById('userLoginAdmin').value = '';
+      document.getElementById('userPasswordAdmin').value = '';
+      document.getElementById('userPositionAdmin').value = 'scout';
+    });
+
+    updateUserBtn.addEventListener('click', () => {
+      const id = updateUserBtn.dataset.editId;
+      const name = document.getElementById('userName').value;
+      const login = document.getElementById('userLoginAdmin').value;
+      const password = document.getElementById('userPasswordAdmin').value;
+      const position = document.getElementById('userPositionAdmin').value;
+      
+      if (!name || !login) {
+        alert('Заполните имя и логин');
+        return;
+      }
+      
+      // Проверяем, не занят ли логин другим пользователем
+      const existingUser = appData.users.find(u => u.login === login && u.id !== id);
+      if (existingUser) {
+        alert('Пользователь с таким логином уже существует');
+        return;
+      }
+      
+      const user = appData.users.find(u => u.id === id);
+      if (user) {
+        user.name = name;
+        user.login = login;
+        user.position = position;
+        
+        // Обновляем пароль только если он был изменен
+        if (password) {
+          user.password = password;
+        }
+        
+        saveData();
+        updateUserList();
+        cancelUserEdit();
+        
+        // Если редактируем текущего пользователя, обновляем информацию
+        if (currentUser && currentUser.id === id) {
+          currentUser = user;
+          document.getElementById('currentUser').textContent = user.name;
+          showUserInfo();
+        }
+      }
+    });
+
+    cancelEditUserBtn.addEventListener('click', cancelUserEdit);
+
+    addTaskBtn.addEventListener('click', () => {
+      const name = document.getElementById('taskName').value;
+      const type = document.getElementById('taskType').value;
+      const assignee = document.getElementById('taskAssignee').value;
+      const dueDate = document.getElementById('taskDueDate').value;
+      const description = document.getElementById('taskDescription').value;
+      const location = document.getElementById('taskLocation').value;
+      
+      if (!name || !dueDate) {
+        alert('Заполните название и срок выполнения');
+        return;
+      }
+      
+      let locationCoords;
+      try {
+        if (location.includes(',')) {
+          locationCoords = location.split(',').map(coord => parseFloat(coord.trim()));
+          if (locationCoords.length !== 2 || isNaN(locationCoords[0]) || isNaN(locationCoords[1])) {
+            throw new Error('Неверный формат координат');
+          }
+        } else {
+          throw new Error('Введите координаты в формате "широта, долгота"');
+        }
+      } catch (e) {
+        alert('Неверный формат местоположения. Введите координаты в формате "широта, долгота"');
+        return;
+      }
+      
+      const newTask = {
+        id: `t${Date.now()}`,
+        name,
+        type,
+        assignee,
+        dueDate: new Date(dueDate).toISOString(),
+        description,
+        location: locationCoords,
+        status: 'pending'
+      };
+      
+      appData.tasks.push(newTask);
+      saveData();
+      updateTaskList();
+      addZones();
+      
+      document.getElementById('taskName').value = '';
+      document.getElementById('taskType').value = 'delivery';
+      document.getElementById('taskAssignee').value = '';
+      document.getElementById('taskDueDate').value = '';
+      document.getElementById('taskDescription').value = '';
+      document.getElementById('taskLocation').value = '';
+    });
+
+    updateTaskBtn.addEventListener('click', () => {
+      const id = updateTaskBtn.dataset.editId;
+      const name = document.getElementById('taskName').value;
+      const type = document.getElementById('taskType').value;
+      const assignee = document.getElementById('taskAssignee').value;
+      const dueDate = document.getElementById('taskDueDate').value;
+      const description = document.getElementById('taskDescription').value;
+      const location = document.getElementById('taskLocation').value;
+      
+      if (!name || !dueDate) {
+        alert('Заполните название и срок выполнения');
+        return;
+      }
+      
+      let locationCoords;
+      try {
+        if (location.includes(',')) {
+          locationCoords = location.split(',').map(coord => parseFloat(coord.trim()));
+          if (locationCoords.length !== 2 || isNaN(locationCoords[0]) || isNaN(locationCoords[1])) {
+            throw new Error('Неверный формат координат');
+          }
+        } else {
+          throw new Error('Введите координаты в формате "широта, долгота"');
+        }
+      } catch (e) {
+        alert('Неверный формат местоположения. Введите координаты в формате "широта, долгота"');
+        return;
+      }
+      
+      const task = appData.tasks.find(t => t.id === id);
+      if (task) {
+        task.name = name;
+        task.type = type;
+        task.assignee = assignee;
+        task.dueDate = new Date(dueDate).toISOString();
+        task.description = description;
+        task.location = locationCoords;
+        
+        saveData();
+        updateTaskList();
+        addZones();
+        cancelTaskEdit();
+      }
+    });
+
+    cancelEditTaskBtn.addEventListener('click', cancelTaskEdit);
+
+    selectOnMapBtn.addEventListener('click', () => {
+      alert('Нажмите на карту в нужном месте, чтобы выбрать местоположение');
+      
+      const onClick = (e) => {
+        document.getElementById('taskLocation').value = `${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
+        map.off('click', onClick);
+      };
+      
+      map.on('click', onClick);
+    });
+
+    // Инициализация приложения
+    function initApp() {
+      addZones();
+      loadCafes();
+      toggleDrawControl(false);
+      
+      // Показываем панель слоев по умолчанию
+      document.getElementById('layersPanel').classList.remove('hidden');
+      
+      // Проверяем, есть ли текущий пользователь в localStorage
+      const savedUser = localStorage.getItem('currentUser');
+      if (savedUser) {
+        const user = JSON.parse(savedUser);
+        const validUser = appData.users.find(u => u.id === user.id && u.login === user.login);
+        if (validUser) {
+          currentUser = validUser;
+          document.getElementById('userStatus').classList.remove('hidden');
+          document.getElementById('currentUser').textContent = validUser.name;
+          userLoginBtn.innerHTML = '<i class="fas fa-user mr-1"></i>Профиль';
+        }
+      }
+    }
+
+    // Запуск приложения
+    initApp();
   </script>
 </body>
-
 </html>
