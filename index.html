@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>E.O.M - Система управления</title>
+  <title>E.O.M - Управление территорией</title>
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
   <!-- Leaflet.Draw CSS -->
@@ -274,6 +274,43 @@
       color: #6b7280;
       margin-top: 8px;
     }
+    
+    .draw-toolbar {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: white;
+      padding: 8px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      z-index: 10;
+      display: flex;
+      gap: 8px;
+    }
+    
+    .draw-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: white;
+      border: 1px solid #d1d5db;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .draw-btn:hover {
+      background: #f3f4f6;
+    }
+    
+    .draw-btn.active {
+      background: var(--primary-light);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
   </style>
 </head>
 <body>
@@ -300,6 +337,25 @@
   <main class="relative pt-16 h-full">
     <!-- Карта -->
     <div id="map"></div>
+    
+    <!-- Панель инструментов рисования -->
+    <div id="drawToolbar" class="draw-toolbar hidden">
+      <button id="drawPolygon" class="draw-btn" title="Нарисовать полигон">
+        <i class="fas fa-draw-polygon"></i>
+      </button>
+      <button id="drawRectangle" class="draw-btn" title="Нарисовать прямоугольник">
+        <i class="fas fa-vector-square"></i>
+      </button>
+      <button id="drawMarker" class="draw-btn" title="Добавить маркер">
+        <i class="fas fa-map-marker-alt"></i>
+      </button>
+      <button id="saveDrawing" class="draw-btn" title="Сохранить">
+        <i class="fas fa-check"></i>
+      </button>
+      <button id="cancelDrawing" class="draw-btn" title="Отменить">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
     
     <!-- Панель управления картой -->
     <div id="mapControls" class="fixed top-20 left-4 z-10 bg-white rounded-lg shadow-lg p-3 w-64">
@@ -333,8 +389,8 @@
         
         <div>
           <label class="flex items-center justify-between cursor-pointer">
-            <span class="text-sm font-medium text-gray-700">Офисы</span>
-            <input type="checkbox" id="officeLayerToggle" checked class="sr-only peer">
+            <span class="text-sm font-medium text-gray-700">Контрольные точки</span>
+            <input type="checkbox" id="checkpointLayerToggle" checked class="sr-only peer">
             <div class="relative w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-green-600">
               <div class="absolute top-0.5 left-0.5 bg-white w-5 h-5 rounded-full transition-transform peer-checked:translate-x-5"></div>
             </div>
@@ -343,7 +399,7 @@
         
         <div>
           <label class="flex items-center justify-between cursor-pointer">
-            <span class="text-sm font-medium text-gray-700">Персонал</span>
+            <span class="text-sm font-medium text-gray-700">Скауты</span>
             <input type="checkbox" id="peopleLayerToggle" checked class="sr-only peer">
             <div class="relative w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-green-600">
               <div class="absolute top-0.5 left-0.5 bg-white w-5 h-5 rounded-full transition-transform peer-checked:translate-x-5"></div>
@@ -420,14 +476,6 @@
             <input id="registerPassword" type="password" class="form-control" placeholder="Придумайте пароль">
           </div>
           
-          <div class="mb-4">
-            <label class="form-label">Должность</label>
-            <select id="registerPosition" class="form-control">
-              <option value="scout">Скаут</option>
-              <option value="manager">Менеджер</option>
-            </select>
-          </div>
-          
           <button id="submitRegister" class="btn btn-primary w-full mb-3">
             <i class="fas fa-user-plus"></i>
             <span>Зарегистрироваться</span>
@@ -465,11 +513,6 @@
             <button id="userTasksBtn" class="btn btn-outline w-full text-left">
               <i class="fas fa-tasks"></i>
               <span>Мои задания</span>
-            </button>
-            
-            <button id="userReportsBtn" class="btn btn-outline w-full text-left">
-              <i class="fas fa-chart-bar"></i>
-              <span>Мои отчеты</span>
             </button>
             
             <button id="userLogout" class="btn btn-danger w-full mt-4">
@@ -511,8 +554,7 @@
                   <select id="zoneType" class="form-control">
                     <option value="work">Рабочая зона</option>
                     <option value="rest">Зона отдыха</option>
-                    <option value="office">Офис</option>
-                    <option value="checkpoint">Контрольный пункт</option>
+                    <option value="checkpoint">Контрольная точка</option>
                   </select>
                 </div>
                 
@@ -523,8 +565,13 @@
               </div>
               
               <div class="mb-4">
+                <label class="form-label">Описание</label>
+                <textarea id="zoneDescription" rows="2" class="form-control" placeholder="Дополнительная информация"></textarea>
+              </div>
+              
+              <div class="mb-4">
                 <label class="form-label">Координаты</label>
-                <textarea id="zoneCoords" rows="3" class="form-control" placeholder="Введите координаты в формате JSON или нарисуйте на карте"></textarea>
+                <textarea id="zoneCoords" rows="3" class="form-control" placeholder="Нарисуйте зону на карте или введите координаты вручную"></textarea>
               </div>
               
               <div class="flex gap-2">
@@ -636,21 +683,20 @@
         <!-- Управление заданиями -->
         <div id="adminTasksSection" class="hidden">
           <div class="panel mb-6">
-            <div class="panel-header">Создать/редактировать задание</div>
+            <div class="panel-header">Создать задание</div>
             <div class="p-4">
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label class="form-label">Название задания</label>
-                  <input id="taskName" type="text" class="form-control" placeholder="Введите название">
+                  <input id="taskName" type="text" class="form-control" placeholder="Например: Убрать самокаты">
                 </div>
                 
                 <div>
                   <label class="form-label">Тип задания</label>
                   <select id="taskType" class="form-control">
-                    <option value="delivery">Доставка</option>
-                    <option value="inspection">Проверка</option>
-                    <option value="meeting">Встреча</option>
-                    <option value="other">Другое</option>
+                    <option value="cleaning">Уборка территории</option>
+                    <option value="inspection">Проверка порядка</option>
+                    <option value="patrol">Патрулирование</option>
                   </select>
                 </div>
                 
@@ -673,13 +719,10 @@
               </div>
               
               <div class="mb-4">
-                <label class="form-label">Местоположение</label>
-                <div class="flex gap-2">
-                  <input id="taskLocation" type="text" class="form-control flex-1" placeholder="Координаты или адрес">
-                  <button id="selectLocationOnMap" class="btn btn-outline">
-                    <i class="fas fa-map-marker-alt"></i>
-                  </button>
-                </div>
+                <label class="form-label">Зона выполнения</label>
+                <select id="taskZone" class="form-control">
+                  <!-- Зоны будут здесь -->
+                </select>
               </div>
               
               <div class="flex gap-2">
@@ -749,7 +792,6 @@
     // Слои для зон
     const workLayer = L.layerGroup().addTo(map);
     const restLayer = L.layerGroup().addTo(map);
-    const officeLayer = L.layerGroup().addTo(map);
     const checkpointLayer = L.layerGroup().addTo(map);
     const peopleLayer = L.layerGroup().addTo(map);
     const tasksLayer = L.layerGroup().addTo(map);
@@ -773,20 +815,16 @@
 
     // Иконки для заданий
     const taskIcons = {
-      delivery: L.divIcon({ 
-        className: 'fas fa-truck bg-orange-500 text-white p-1 rounded-full',
+      cleaning: L.divIcon({ 
+        className: 'fas fa-broom bg-orange-500 text-white p-1 rounded-full',
         iconSize: [24, 24]
       }),
       inspection: L.divIcon({ 
         className: 'fas fa-clipboard-check bg-blue-500 text-white p-1 rounded-full',
         iconSize: [24, 24]
       }),
-      meeting: L.divIcon({ 
-        className: 'fas fa-handshake bg-green-500 text-white p-1 rounded-full',
-        iconSize: [24, 24]
-      }),
-      other: L.divIcon({ 
-        className: 'fas fa-tasks bg-gray-500 text-white p-1 rounded-full',
+      patrol: L.divIcon({ 
+        className: 'fas fa-walking bg-green-500 text-white p-1 rounded-full',
         iconSize: [24, 24]
       })
     };
@@ -826,12 +864,6 @@
             coords: [[43.25, 76.85], [43.25, 76.90], [43.30, 76.90], [43.30, 76.85]], 
             name: 'Центральный район', 
             description: 'Основная рабочая зона' 
-          },
-          { 
-            id: 'w2', 
-            coords: [[43.22, 76.92], [43.22, 76.97], [43.27, 76.97], [43.27, 76.92]], 
-            name: 'Торговая зона', 
-            description: 'Магазины и торговые центры' 
           }
         ],
         rest: [
@@ -839,35 +871,27 @@
             id: 'r1', 
             coords: [[43.23, 76.88], [43.23, 76.93], [43.28, 76.93], [43.28, 76.88]], 
             name: 'Центральный парк', 
-            description: 'Место для отдыха сотрудников' 
-          }
-        ],
-        office: [
-          { 
-            id: 'o1', 
-            coords: [43.238, 76.89], 
-            name: 'Главный офис', 
-            description: 'Основное здание компании' 
+            description: 'Место для отдыха' 
           }
         ],
         checkpoint: [
           { 
             id: 'c1', 
             coords: [43.24, 76.91], 
-            name: 'Контрольный пункт 1', 
-            description: 'Проверка документов' 
+            name: 'Контрольная точка 1', 
+            description: 'Основной контрольный пункт' 
           }
         ]
       },
       tasks: [
         { 
           id: 't1', 
-          name: 'Доставка документов', 
-          type: 'delivery', 
+          name: 'Убрать самокаты', 
+          type: 'cleaning', 
           assignee: 'u3', 
           dueDate: new Date(Date.now() + 86400000).toISOString(), 
-          description: 'Доставить документы в главный офис', 
-          location: [43.238, 76.89], 
+          description: 'Убрать все самокаты в парковой зоне', 
+          zone: 'r1',
           status: 'pending' 
         }
       ],
@@ -880,82 +904,14 @@
 
     // Текущий пользователь
     let currentUser = null;
-
-    // Leaflet.Draw для рисования зон
-    const drawControl = new L.Control.Draw({
-      edit: { featureGroup: drawnItems },
-      draw: { 
-        polyline: false, 
-        circle: false, 
-        marker: true, 
-        polygon: true, 
-        rectangle: true,
-        circlemarker: false
-      }
-    });
-
-    // Показываем Draw Control только для админа
-    function toggleDrawControl(show) {
-      if (show) {
-        map.addControl(drawControl);
-      } else {
-        map.removeControl(drawControl);
-      }
-    }
-
-    // Обработка созданных объектов
-    map.on(L.Draw.Event.CREATED, (e) => {
-      const layer = e.layer;
-      drawnItems.addLayer(layer);
-      const type = document.getElementById('zoneType').value;
-      const name = document.getElementById('zoneName').value || `Новая зона ${Date.now().toString().slice(-4)}`;
-      
-      let coords;
-      if (e.layerType === 'marker') {
-        coords = [layer.getLatLng().lat, layer.getLatLng().lng];
-      } else {
-        coords = layer.getLatLngs()[0].map(l => [l.lat, l.lng]);
-      }
-      
-      // Если идет редактирование
-      if (!document.getElementById('updateZoneBtn').classList.contains('hidden')) {
-        const editId = document.getElementById('updateZoneBtn').dataset.editId;
-        const editType = document.getElementById('updateZoneBtn').dataset.editType;
-        
-        // Удаляем старую зону
-        appData.zones[editType] = appData.zones[editType].filter(z => z.id !== editId);
-        
-        // Добавляем обновленную
-        appData.zones[type].push({ 
-          id: editId, 
-          coords, 
-          name,
-          description: document.getElementById('zoneDescription')?.value || ''
-        });
-        
-        // Сбрасываем режим редактирования
-        cancelZoneEdit();
-      } else {
-        // Добавляем новую зону
-        appData.zones[type].push({ 
-          id: `${type}_${Date.now()}`, 
-          coords, 
-          name,
-          description: document.getElementById('zoneDescription')?.value || ''
-        });
-      }
-      
-      saveData();
-      renderZones();
-      updateZonesList();
-    });
+    let currentDrawing = null;
+    let currentDrawControl = null;
 
     // Функция для отображения зон на карте
     function renderZones() {
       // Очищаем все слои
       workLayer.clearLayers();
       restLayer.clearLayers();
-      officeLayer.clearLayers();
       checkpointLayer.clearLayers();
       peopleLayer.clearLayers();
       tasksLayer.clearLayers();
@@ -992,23 +948,7 @@
         `);
       });
 
-      // Офисы
-      appData.zones.office.forEach(zone => {
-        const marker = L.marker(zone.coords, {
-          icon: L.divIcon({ 
-            className: 'fas fa-building bg-yellow-500 text-white p-1 rounded-full',
-            iconSize: [24, 24]
-          })
-        }).addTo(officeLayer);
-        
-        marker.bindPopup(`
-          <h3>${zone.name}</h3>
-          <p>${zone.description || 'Нет описания'}</p>
-          <p class="meta">Тип: Офис</p>
-        `);
-      });
-
-      // Контрольные пункты
+      // Контрольные точки
       appData.zones.checkpoint.forEach(zone => {
         const marker = L.marker(zone.coords, {
           icon: L.divIcon({ 
@@ -1020,7 +960,7 @@
         marker.bindPopup(`
           <h3>${zone.name}</h3>
           <p>${zone.description || 'Нет описания'}</p>
-          <p class="meta">Тип: Контрольный пункт</p>
+          <p class="meta">Тип: Контрольная точка</p>
         `);
       });
 
@@ -1042,21 +982,46 @@
 
       // Задания
       appData.tasks.forEach(task => {
-        const marker = L.marker(task.location, {
-          icon: taskIcons[task.type]
-        }).addTo(tasksLayer);
-        
-        const assignee = appData.users.find(u => u.id === task.assignee);
-        const assigneeName = assignee ? assignee.name : 'Не назначен';
-        
-        marker.bindPopup(`
-          <h3>${task.name}</h3>
-          <p>${task.description || 'Нет описания'}</p>
-          <p>Исполнитель: ${assigneeName}</p>
-          <p>Срок: ${new Date(task.dueDate).toLocaleString()}</p>
-          <p class="meta">Статус: ${getTaskStatusName(task.status)}</p>
-        `);
+        const zone = [...appData.zones.work, ...appData.zones.rest].find(z => z.id === task.zone);
+        if (zone) {
+          const center = getPolygonCenter(zone.coords);
+          const marker = L.marker(center, {
+            icon: taskIcons[task.type]
+          }).addTo(tasksLayer);
+          
+          const assignee = appData.users.find(u => u.id === task.assignee);
+          const assigneeName = assignee ? assignee.name : 'Не назначен';
+          
+          marker.bindPopup(`
+            <h3>${task.name}</h3>
+            <p>${task.description || 'Нет описания'}</p>
+            <p>Исполнитель: ${assigneeName}</p>
+            <p>Срок: ${new Date(task.dueDate).toLocaleString()}</p>
+            <p class="meta">Статус: ${getTaskStatusName(task.status)}</p>
+          `);
+        }
       });
+    }
+
+    // Получение центра полигона
+    function getPolygonCenter(coords) {
+      if (coords[0] && !Array.isArray(coords[0][0])) {
+        // Это точка
+        return coords;
+      }
+      
+      // Это полигон
+      let latSum = 0;
+      let lngSum = 0;
+      let count = 0;
+      
+      coords[0].forEach(point => {
+        latSum += point[0];
+        lngSum += point[1];
+        count++;
+      });
+      
+      return [latSum / count, lngSum / count];
     }
 
     // Получение названия должности
@@ -1089,6 +1054,26 @@
         cancelled: 'badge-red'
       };
       return classes[status] || 'badge';
+    }
+
+    // Получение названия типа зоны
+    function getZoneTypeName(type) {
+      const types = {
+        work: 'Рабочая зона',
+        rest: 'Зона отдыха',
+        checkpoint: 'Контрольная точка'
+      };
+      return types[type] || type;
+    }
+
+    // Получение названия типа задания
+    function getTaskTypeName(type) {
+      const types = {
+        cleaning: 'Уборка',
+        inspection: 'Проверка',
+        patrol: 'Патрулирование'
+      };
+      return types[type] || type;
     }
 
     // Сохранение данных в localStorage
@@ -1126,6 +1111,17 @@
         });
       });
 
+      // Обновляем список зон в форме создания задания
+      const taskZoneSelect = document.getElementById('taskZone');
+      taskZoneSelect.innerHTML = '';
+      
+      [...appData.zones.work, ...appData.zones.rest].forEach(zone => {
+        const option = document.createElement('option');
+        option.value = zone.id;
+        option.textContent = `${zone.name} (${getZoneTypeName(zone.type)})`;
+        taskZoneSelect.appendChild(option);
+      });
+
       // Обработчики для кнопок редактирования и удаления
       document.querySelectorAll('.edit-zone').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -1135,6 +1131,7 @@
           
           document.getElementById('zoneType').value = type;
           document.getElementById('zoneName').value = zone.name;
+          document.getElementById('zoneDescription').value = zone.description || '';
           document.getElementById('zoneCoords').value = JSON.stringify(zone.coords);
           
           // Переключаем в режим редактирования
@@ -1156,25 +1153,16 @@
             saveData();
             renderZones();
             updateZonesList();
+            updateTasksList();
           }
         });
       });
     }
 
-    // Получение названия типа зоны
-    function getZoneTypeName(type) {
-      const types = {
-        work: 'Рабочая зона',
-        rest: 'Зона отдыха',
-        office: 'Офис',
-        checkpoint: 'Контрольный пункт'
-      };
-      return types[type] || type;
-    }
-
     // Выход из режима редактирования зоны
     function cancelZoneEdit() {
       document.getElementById('zoneName').value = '';
+      document.getElementById('zoneDescription').value = '';
       document.getElementById('zoneCoords').value = '';
       
       document.getElementById('addZoneBtn').classList.remove('hidden');
@@ -1183,6 +1171,13 @@
       
       delete document.getElementById('updateZoneBtn').dataset.editId;
       delete document.getElementById('updateZoneBtn').dataset.editType;
+      
+      // Очищаем рисунок на карте
+      if (currentDrawing) {
+        map.removeLayer(currentDrawing);
+        currentDrawing = null;
+      }
+      hideDrawToolbar();
     }
 
     // Обновление списка пользователей в админ-панели
@@ -1212,11 +1207,13 @@
         `;
         usersList.appendChild(tr);
         
-        // Добавляем в выпадающий список для заданий
-        const option = document.createElement('option');
-        option.value = user.id;
-        option.textContent = `${user.name} (${getPositionName(user.position)})`;
-        taskAssigneeSelect.appendChild(option);
+        // Добавляем в выпадающий список для заданий (только скаутов)
+        if (user.position === 'scout') {
+          const option = document.createElement('option');
+          option.value = user.id;
+          option.textContent = `${user.name}`;
+          taskAssigneeSelect.appendChild(option);
+        }
       });
 
       // Обработчики для кнопок редактирования и удаления пользователей
@@ -1294,7 +1291,7 @@
       
       appData.tasks.forEach(task => {
         const assignee = appData.users.find(u => u.id === task.assignee);
-        const assigneeName = assignee ? `${assignee.name} (${getPositionName(assignee.position)})` : 'Не назначен';
+        const assigneeName = assignee ? assignee.name : 'Не назначен';
         
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -1325,7 +1322,7 @@
           document.getElementById('taskAssignee').value = task.assignee;
           document.getElementById('taskDueDate').value = new Date(task.dueDate).toISOString().slice(0, 16);
           document.getElementById('taskDescription').value = task.description || '';
-          document.getElementById('taskLocation').value = task.location.join(', ');
+          document.getElementById('taskZone').value = task.zone;
           
           // Переключаем в режим редактирования
           document.getElementById('addTaskBtn').classList.add('hidden');
@@ -1352,17 +1349,109 @@
     // Выход из режима редактирования задания
     function cancelTaskEdit() {
       document.getElementById('taskName').value = '';
-      document.getElementById('taskType').value = 'delivery';
+      document.getElementById('taskType').value = 'cleaning';
       document.getElementById('taskAssignee').value = '';
       document.getElementById('taskDueDate').value = '';
       document.getElementById('taskDescription').value = '';
-      document.getElementById('taskLocation').value = '';
+      document.getElementById('taskZone').value = '';
       
       document.getElementById('addTaskBtn').classList.remove('hidden');
       document.getElementById('updateTaskBtn').classList.add('hidden');
       document.getElementById('cancelTaskEditBtn').classList.add('hidden');
       
       delete document.getElementById('updateTaskBtn').dataset.editId;
+    }
+
+    // Показать панель рисования
+    function showDrawToolbar() {
+      document.getElementById('drawToolbar').classList.remove('hidden');
+    }
+
+    // Скрыть панель рисования
+    function hideDrawToolbar() {
+      document.getElementById('drawToolbar').classList.add('hidden');
+    }
+
+    // Начать рисование полигона
+    function startDrawingPolygon() {
+      if (currentDrawing) {
+        map.removeLayer(currentDrawing);
+      }
+      
+      currentDrawing = new L.Draw.Polygon(map, {
+        shapeOptions: {
+          color: '#3b82f6',
+          fillColor: '#3b82f6',
+          fillOpacity: 0.3
+        }
+      });
+      
+      currentDrawing.enable();
+      showDrawToolbar();
+    }
+
+    // Начать рисование прямоугольника
+    function startDrawingRectangle() {
+      if (currentDrawing) {
+        map.removeLayer(currentDrawing);
+      }
+      
+      currentDrawing = new L.Draw.Rectangle(map, {
+        shapeOptions: {
+          color: '#3b82f6',
+          fillColor: '#3b82f6',
+          fillOpacity: 0.3
+        }
+      });
+      
+      currentDrawing.enable();
+      showDrawToolbar();
+    }
+
+    // Начать добавление маркера
+    function startDrawingMarker() {
+      if (currentDrawing) {
+        map.removeLayer(currentDrawing);
+      }
+      
+      currentDrawing = new L.Draw.Marker(map, {
+        icon: new L.Icon.Default()
+      });
+      
+      currentDrawing.enable();
+      showDrawToolbar();
+    }
+
+    // Сохранить рисунок
+    function saveDrawing() {
+      if (currentDrawing && currentDrawing._layer) {
+        const layer = currentDrawing._layer;
+        let coords;
+        
+        if (layer instanceof L.Polygon || layer instanceof L.Rectangle) {
+          coords = layer.getLatLngs()[0].map(latLng => [latLng.lat, latLng.lng]);
+        } else if (layer instanceof L.Marker) {
+          coords = [layer.getLatLng().lat, layer.getLatLng().lng];
+        }
+        
+        if (coords) {
+          document.getElementById('zoneCoords').value = JSON.stringify(coords);
+          hideDrawToolbar();
+          
+          // Очищаем рисунок
+          map.removeLayer(layer);
+          currentDrawing = null;
+        }
+      }
+    }
+
+    // Отменить рисование
+    function cancelDrawing() {
+      if (currentDrawing && currentDrawing._layer) {
+        map.removeLayer(currentDrawing._layer);
+      }
+      currentDrawing = null;
+      hideDrawToolbar();
     }
 
     // Управление видимостью слоев
@@ -1382,11 +1471,11 @@
       }
     });
 
-    document.getElementById('officeLayerToggle').addEventListener('change', (e) => {
+    document.getElementById('checkpointLayerToggle').addEventListener('change', (e) => {
       if (e.target.checked) {
-        map.addLayer(officeLayer);
+        map.addLayer(checkpointLayer);
       } else {
-        map.removeLayer(officeLayer);
+        map.removeLayer(checkpointLayer);
       }
     });
 
@@ -1428,7 +1517,6 @@
       }
       
       adminModal.classList.add('active');
-      toggleDrawControl(true);
       updateZonesList();
       updateUsersList();
       updateTasksList();
@@ -1436,7 +1524,6 @@
 
     function closeAdminModal() {
       adminModal.classList.remove('active');
-      toggleDrawControl(false);
       cancelZoneEdit();
       cancelUserEdit();
       cancelTaskEdit();
@@ -1516,6 +1603,20 @@
       document.getElementById('adminUsersSection').classList.add('hidden');
     });
 
+    // Инструменты рисования
+    document.getElementById('drawPolygon').addEventListener('click', startDrawingPolygon);
+    document.getElementById('drawRectangle').addEventListener('click', startDrawingRectangle);
+    document.getElementById('drawMarker').addEventListener('click', startDrawingMarker);
+    document.getElementById('saveDrawing').addEventListener('click', saveDrawing);
+    document.getElementById('cancelDrawing').addEventListener('click', cancelDrawing);
+
+    // Обработка созданных объектов
+    map.on(L.Draw.Event.CREATED, (e) => {
+      const layer = e.layer;
+      drawnItems.addLayer(layer);
+      currentDrawing = e;
+    });
+
     // Вход пользователя
     document.getElementById('submitLogin').addEventListener('click', () => {
       const login = document.getElementById('loginInput').value;
@@ -1553,7 +1654,6 @@
       const name = document.getElementById('registerName').value;
       const login = document.getElementById('registerLogin').value;
       const password = document.getElementById('registerPassword').value;
-      const position = document.getElementById('registerPosition').value;
       
       if (!name || !login || !password) {
         alert('Заполните все обязательные поля');
@@ -1570,7 +1670,7 @@
         name,
         login,
         password,
-        position,
+        position: 'scout',
         lastLogin: new Date().toISOString()
       };
       
@@ -1608,6 +1708,7 @@
     document.getElementById('addZoneBtn').addEventListener('click', () => {
       const type = document.getElementById('zoneType').value;
       const name = document.getElementById('zoneName').value;
+      const description = document.getElementById('zoneDescription').value;
       let coords;
       
       try {
@@ -1623,7 +1724,7 @@
           id, 
           coords, 
           name,
-          description: ''
+          description
         });
         
         saveData();
@@ -1631,6 +1732,7 @@
         updateZonesList();
         
         document.getElementById('zoneName').value = '';
+        document.getElementById('zoneDescription').value = '';
         document.getElementById('zoneCoords').value = '';
       } else {
         alert('Заполните название и координаты');
@@ -1642,6 +1744,7 @@
       const oldType = document.getElementById('updateZoneBtn').dataset.editType;
       const type = document.getElementById('zoneType').value;
       const name = document.getElementById('zoneName').value;
+      const description = document.getElementById('zoneDescription').value;
       let coords;
       
       try {
@@ -1660,7 +1763,7 @@
           id, 
           coords, 
           name,
-          description: ''
+          description
         });
         
         saveData();
@@ -1762,25 +1865,10 @@
       const assignee = document.getElementById('taskAssignee').value;
       const dueDate = document.getElementById('taskDueDate').value;
       const description = document.getElementById('taskDescription').value;
-      const location = document.getElementById('taskLocation').value;
+      const zone = document.getElementById('taskZone').value;
       
-      if (!name || !dueDate) {
-        alert('Заполните название и срок выполнения');
-        return;
-      }
-      
-      let locationCoords;
-      try {
-        if (location.includes(',')) {
-          locationCoords = location.split(',').map(coord => parseFloat(coord.trim()));
-          if (locationCoords.length !== 2 || isNaN(locationCoords[0]) || isNaN(locationCoords[1])) {
-            throw new Error('Неверный формат координат');
-          }
-        } else {
-          throw new Error('Введите координаты в формате "широта, долгота"');
-        }
-      } catch (e) {
-        alert('Неверный формат местоположения. Введите координаты в формате "широта, долгота"');
+      if (!name || !dueDate || !zone) {
+        alert('Заполните название, срок выполнения и зону');
         return;
       }
       
@@ -1791,7 +1879,7 @@
         assignee,
         dueDate: new Date(dueDate).toISOString(),
         description,
-        location: locationCoords,
+        zone,
         status: 'pending'
       };
       
@@ -1801,11 +1889,11 @@
       renderZones();
       
       document.getElementById('taskName').value = '';
-      document.getElementById('taskType').value = 'delivery';
+      document.getElementById('taskType').value = 'cleaning';
       document.getElementById('taskAssignee').value = '';
       document.getElementById('taskDueDate').value = '';
       document.getElementById('taskDescription').value = '';
-      document.getElementById('taskLocation').value = '';
+      document.getElementById('taskZone').value = '';
     });
 
     document.getElementById('updateTaskBtn').addEventListener('click', () => {
@@ -1815,25 +1903,10 @@
       const assignee = document.getElementById('taskAssignee').value;
       const dueDate = document.getElementById('taskDueDate').value;
       const description = document.getElementById('taskDescription').value;
-      const location = document.getElementById('taskLocation').value;
+      const zone = document.getElementById('taskZone').value;
       
-      if (!name || !dueDate) {
-        alert('Заполните название и срок выполнения');
-        return;
-      }
-      
-      let locationCoords;
-      try {
-        if (location.includes(',')) {
-          locationCoords = location.split(',').map(coord => parseFloat(coord.trim()));
-          if (locationCoords.length !== 2 || isNaN(locationCoords[0]) || isNaN(locationCoords[1])) {
-            throw new Error('Неверный формат координат');
-          }
-        } else {
-          throw new Error('Введите координаты в формате "широта, долгота"');
-        }
-      } catch (e) {
-        alert('Неверный формат местоположения. Введите координаты в формате "широта, долгота"');
+      if (!name || !dueDate || !zone) {
+        alert('Заполните название, срок выполнения и зону');
         return;
       }
       
@@ -1844,7 +1917,7 @@
         task.assignee = assignee;
         task.dueDate = new Date(dueDate).toISOString();
         task.description = description;
-        task.location = locationCoords;
+        task.zone = zone;
         
         saveData();
         updateTasksList();
@@ -1855,25 +1928,20 @@
 
     document.getElementById('cancelTaskEditBtn').addEventListener('click', cancelTaskEdit);
 
-    // Выбор местоположения на карте для задания
-    document.getElementById('selectLocationOnMap').addEventListener('click', () => {
-      alert('Нажмите на карте в нужном месте, чтобы выбрать местоположение');
-      closeAdminModal();
-      
-      const onClick = (e) => {
-        document.getElementById('taskLocation').value = `${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
-        map.off('click', onClick);
+    // Просмотр заданий пользователем
+    document.getElementById('userTasksBtn').addEventListener('click', () => {
+      if (currentUser && currentUser.position === 'admin') {
         openAdminModal();
         document.getElementById('adminTasksTab').click();
-      };
-      
-      map.on('click', onClick);
+      } else {
+        alert('Ваши задания будут отображены здесь');
+      }
     });
 
     // Инициализация приложения
     function initApp() {
       renderZones();
-      toggleDrawControl(false);
+      hideDrawToolbar();
       
       // Проверяем, есть ли текущий пользователь в localStorage
       const savedUser = localStorage.getItem('currentUser');
