@@ -3,9 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Карта Алматы для скаутов</title>
+  <title>Карта Алматы для скаутов с админ-панелью</title>
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <!-- Leaflet.Draw CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
   <!-- Tailwind CSS через CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -13,6 +15,8 @@
     body { margin: 0; font-family: Arial, sans-serif; }
     .zone-btn { transition: background-color 0.3s; }
     .zone-btn.active { background-color: #1e40af; color: white; }
+    #adminPanel { display: none; }
+    .admin-form { max-height: 70vh; overflow-y: auto; }
   </style>
 </head>
 <body class="bg-gray-100">
@@ -22,14 +26,44 @@
       <button id="workZone" class="zone-btn px-4 py-2 bg-blue-100 rounded-md text-sm font-semibold">Рабочие зоны</button>
       <button id="restZone" class="zone-btn px-4 py-2 bg-green-100 rounded-md text-sm font-semibold">Зоны отдыха</button>
       <button id="officeZone" class="zone-btn px-4 py-2 bg-yellow-100 rounded-md text-sm font-semibold">Офисы</button>
+      <button id="adminLogin" class="px-4 py-2 bg-red-100 rounded-md text-sm font-semibold">Админ</button>
     </div>
   </div>
 
   <!-- Контейнер для карты -->
   <div id="map" class="mt-16"></div>
 
+  <!-- Панель администратора -->
+  <div id="adminPanel" class="fixed inset-0 bg-white p-4 z-20 overflow-y-auto">
+    <div class="flex justify-between">
+      <h2 class="text-lg font-bold">Панель администратора</h2>
+      <button id="closeAdmin" class="text-red-500">Закрыть</button>
+    </div>
+    <!-- Форма входа -->
+    <div id="loginForm" class="mt-4">
+      <input id="adminPassword" type="password" placeholder="Введите пароль" class="w-full p-2 border rounded-md">
+      <button id="submitPassword" class="w-full mt-2 bg-blue-500 text-white p-2 rounded-md">Войти</button>
+    </div>
+    <!-- Форма управления зонами -->
+    <div id="adminControls" class="admin-form hidden mt-4">
+      <h3 class="font-semibold">Добавить/Редактировать зону</h3>
+      <select id="zoneType" class="w-full p-2 border rounded-md">
+        <option value="work">Рабочая зона</option>
+        <option value="rest">Зона отдыха</option>
+        <option value="office">Офис</option>
+      </select>
+      <input id="zoneName" type="text" placeholder="Название зоны" class="w-full p-2 mt-2 border rounded-md">
+      <textarea id="zoneCoords" placeholder="Координаты (JSON, например, [[43.25, 76.85], ...])" class="w-full p-2 mt-2 border rounded-md"></textarea>
+      <button id="addZone" class="w-full mt-2 bg-green-500 text-white p-2 rounded-md">Добавить/Обновить</button>
+      <h3 class="font-semibold mt-4">Существующие зоны</h3>
+      <ul id="zoneList" class="mt-2"></ul>
+    </div>
+  </div>
+
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <!-- Leaflet.Draw JS -->
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
   <script>
     // Инициализация карты (центр Алматы)
     const map = L.map('map').setView([43.2389, 76.8897], 12);
@@ -44,55 +78,66 @@
     let workLayer = L.layerGroup().addTo(map);
     let restLayer = L.layerGroup().addTo(map);
     let officeLayer = L.layerGroup().addTo(map);
+    let drawnItems = new L.FeatureGroup().addTo(map);
 
-    // Пример зон (полигоны для Алматы)
-    const zones = {
+    // Загрузка зон из localStorage
+    let zones = JSON.parse(localStorage.getItem('zones')) || {
       work: [
-        {
-          coords: [[43.25, 76.85], [43.25, 76.90], [43.30, 76.90], [43.30, 76.85]],
-          popup: 'Рабочая зона: Центр (скауты 1-5)'
-        },
-        {
-          coords: [[43.22, 76.92], [43.22, 76.97], [43.27, 76.97], [43.27, 76.92]],
-          popup: 'Рабочая зона: Магазины'
-        }
+        { id: 'w1', coords: [[43.25, 76.85], [43.25, 76.90], [43.30, 76.90], [43.30, 76.85]], popup: 'Рабочая зона: Центр (скауты 1-5)' },
+        { id: 'w2', coords: [[43.22, 76.92], [43.22, 76.97], [43.27, 76.97], [43.27, 76.92]], popup: 'Рабочая зона: Магазины' }
       ],
       rest: [
-        {
-          coords: [[43.23, 76.88], [43.23, 76.93], [43.28, 76.93], [43.28, 76.88]],
-          popup: 'Зона отдыха: Парк 28 Панфиловцев'
-        }
+        { id: 'r1', coords: [[43.23, 76.88], [43.23, 76.93], [43.28, 76.93], [43.28, 76.88]], popup: 'Зона отдыха: Парк 28 Панфиловцев' }
       ],
       office: [
-        {
-          coords: [[43.238, 76.89]], // Точка для офиса
-          popup: 'Офис компании'
-        }
+        { id: 'o1', coords: [43.238, 76.89], popup: 'Офис компании' }
       ]
     };
 
-    // Функция для добавления зон
+    // Leaflet.Draw для рисования зон
+    const drawControl = new L.Control.Draw({
+      edit: { featureGroup: drawnItems },
+      draw: { polyline: false, circle: false, marker: true, polygon: true, rectangle: true }
+    });
+    map.addControl(drawControl);
+
+    // Обработка созданных объектов
+    map.on(L.Draw.Event.CREATED, (e) => {
+      const layer = e.layer;
+      drawnItems.addLayer(layer);
+      const type = document.getElementById('zoneType').value;
+      const name = prompt('Введите название зоны') || 'Новая зона';
+      const id = `${type}_${Date.now()}`;
+      let coords;
+      if (e.layerType === 'marker') {
+        coords = [layer.getLatLng().lat, layer.getLatLng().lng];
+      } else {
+        coords = layer.getLatLngs()[0].map(l => [l.lat, l.lng]);
+      }
+      zones[type].push({ id, coords, popup: name });
+      saveZones();
+      addZones();
+      updateZoneList();
+    });
+
+    // Функция для отображения зон
     function addZones() {
-      // Очистка слоёв
       workLayer.clearLayers();
       restLayer.clearLayers();
       officeLayer.clearLayers();
 
-      // Рабочие зоны (синие полигоны)
       zones.work.forEach(zone => {
         L.polygon(zone.coords, { color: 'blue', fillOpacity: 0.3 })
           .addTo(workLayer)
           .bindPopup(zone.popup);
       });
 
-      // Зоны отдыха (зелёные полигоны)
       zones.rest.forEach(zone => {
         L.polygon(zone.coords, { color: 'green', fillOpacity: 0.3 })
           .addTo(restLayer)
           .bindPopup(zone.popup);
       });
 
-      // Офисы (жёлтые маркеры)
       zones.office.forEach(zone => {
         L.marker(zone.coords, {
           icon: L.divIcon({ className: 'bg-yellow-500 rounded-full w-4 h-4' })
@@ -100,7 +145,7 @@
       });
     }
 
-    // Загрузка данных из Overpass API (например, кафе)
+    // Загрузка данных из Overpass API (кафе)
     async function loadCafes() {
       const query = `
         [out:json];
@@ -122,20 +167,60 @@
       });
     }
 
-    // Инициализация зон
-    addZones();
-    loadCafes();
+    // Сохранение зон в localStorage
+    function saveZones() {
+      localStorage.setItem('zones', JSON.stringify(zones));
+    }
+
+    // Обновление списка зон в админ-панели
+    function updateZoneList() {
+      const zoneList = document.getElementById('zoneList');
+      zoneList.innerHTML = '';
+      Object.keys(zones).forEach(type => {
+        zones[type].forEach(zone => {
+          const li = document.createElement('li');
+          li.className = 'flex justify-between p-2 border-b';
+          li.innerHTML = `
+            <span>${zone.popup} (${type})</span>
+            <div>
+              <button class="edit-zone text-blue-500 mr-2" data-id="${zone.id}" data-type="${type}">Редактировать</button>
+              <button class="delete-zone text-red-500" data-id="${zone.id}" data-type="${type}">Удалить</button>
+            </div>
+          `;
+          zoneList.appendChild(li);
+        });
+      });
+
+      // Обработчики для редактирования и удаления
+      document.querySelectorAll('.edit-zone').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.id;
+          const type = btn.dataset.type;
+          const zone = zones[type].find(z => z.id === id);
+          document.getElementById('zoneType').value = type;
+          document.getElementById('zoneName').value = zone.popup;
+          document.getElementById('zoneCoords').value = JSON.stringify(zone.coords);
+          document.getElementById('addZone').dataset.editId = id;
+          document.getElementById('addZone').dataset.editType = type;
+        });
+      });
+
+      document.querySelectorAll('.delete-zone').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.id;
+          const type = btn.dataset.type;
+          zones[type] = zones[type].filter(z => z.id !== id);
+          saveZones();
+          addZones();
+          updateZoneList();
+        });
+      });
+    }
 
     // Управление видимостью зон
-    document.getElementById('workZone').addEventListener('click', () => {
-      toggleLayer(workLayer, 'workZone');
-    });
-    document.getElementById('restZone').addEventListener('click', () => {
-      toggleLayer(restLayer, 'restZone');
-    });
-    document.getElementById('officeZone').addEventListener('click', () => {
-      toggleLayer(officeLayer, 'officeZone');
-    });
+    document.getElementById('workZone').addEventListener('click', () => toggleLayer(workLayer, 'workZone'));
+    document.getElementById('restZone').addEventListener('click', () => toggleLayer(restLayer, 'restZone'));
+    document.getElementById('officeZone').addEventListener('click', () => toggleLayer(officeLayer, 'officeZone'));
 
     function toggleLayer(layer, buttonId) {
       if (map.hasLayer(layer)) {
@@ -146,6 +231,63 @@
         document.getElementById(buttonId).classList.add('active');
       }
     }
+
+    // Управление админ-панелью
+    const adminPanel = document.getElementById('adminPanel');
+    const loginForm = document.getElementById('loginForm');
+    const adminControls = document.getElementById('adminControls');
+    const adminPassword = document.getElementById('adminPassword');
+    const submitPassword = document.getElementById('submitPassword');
+    const closeAdmin = document.getElementById('closeAdmin');
+    const addZone = document.getElementById('addZone');
+
+    document.getElementById('adminLogin').addEventListener('click', () => {
+      adminPanel.style.display = 'block';
+      loginForm.style.display = 'block';
+      adminControls.style.display = 'none';
+    });
+
+    submitPassword.addEventListener('click', () => {
+      if (adminPassword.value === 'admin123') { // Простой пароль для примера
+        loginForm.style.display = 'none';
+        adminControls.style.display = 'block';
+        updateZoneList();
+      } else {
+        alert('Неверный пароль');
+      }
+    });
+
+    closeAdmin.addEventListener('click', () => {
+      adminPanel.style.display = 'none';
+      adminPassword.value = '';
+    });
+
+    addZone.addEventListener('click', () => {
+      const type = document.getElementById('zoneType').value;
+      const name = document.getElementById('zoneName').value;
+      const coords = JSON.parse(document.getElementById('zoneCoords').value || '[]');
+      const id = addZone.dataset.editId || `${type}_${Date.now()}`;
+      if (name && coords.length) {
+        if (addZone.dataset.editId) {
+          const oldType = addZone.dataset.editType;
+          zones[oldType] = zones[oldType].filter(z => z.id !== id);
+          delete addZone.dataset.editId;
+          delete addZone.dataset.editType;
+        }
+        zones[type].push({ id, coords, popup: name });
+        saveZones();
+        addZones();
+        updateZoneList();
+        document.getElementById('zoneName').value = '';
+        document.getElementById('zoneCoords').value = '';
+      } else {
+        alert('Заполните название и координаты');
+      }
+    });
+
+    // Инициализация
+    addZones();
+    loadCafes();
   </script>
 </body>
 </html>
